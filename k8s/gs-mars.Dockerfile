@@ -2,8 +2,11 @@
 # libgrape-lite, vineyard, as well as necessary IO dependencies (e.g., hdfs, oss)
 # in the image
 
-ARG BASE_VERSION=latest
-FROM reg.docker.alibaba-inc.com/7brs/vineyard-mars:$BASE_VERSION
+FROM reg.docker.alibaba-inc.com/weibin/gsa-mars-runtime:v5
+
+ADD entrypoint.sh /srv/entrypoint.sh
+
+RUN chmod a+x /srv/entrypoint.sh
 
 COPY ./k8s/kube_ssh /opt/graphscope/bin/kube_ssh
 COPY ./k8s/pre_stop.py /opt/graphscope/bin/pre_stop.py
@@ -15,8 +18,8 @@ RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/graphscope/lib:/opt/graphscope/
     mkdir -p build && \
     cd build && \
     cmake .. -DCMAKE_PREFIX_PATH="/opt/graphscope;/opt/conda" \
-             -DCMAKE_INSTALL_PREFIX=/opt/graphscope \
-             -DEXPERIMENTAL_ON=$EXPERIMENTAL_ON && \
+             -DEXPERIMENTAL_ON=OFF \
+             -DBUILD_TESTS=OFF && \
     make gsa_cpplint && \
     make -j`nproc` && \
     make install && \
@@ -29,10 +32,33 @@ RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/graphscope/lib:/opt/graphscope/
     cd /root/gs/python && \
     pip install -U setuptools && \
     pip install -r requirements.txt -r requirements-dev.txt && \
-    python3 setup.py bdist_wheel && \
-    pip install ./dist/*.whl && \
+    python setup.py bdist_wheel && \
+    cd ./dist && \
+    pip install ./*.whl && \
+    # auditwheel repair --plat=manylinux2014_x86_64 ./*.whl && \
+    # cp ./wheelhouse/* /opt/graphscope/dist/ && \
     cd /root/gs/coordinator && \
     pip install -r requirements.txt -r requirements-dev.txt && \
-    python3 setup.py bdist_wheel && \
-    pip install ./dist/*.whl && \
-    echo "Build python bdist_wheel done."
+    python setup.py bdist_wheel && \
+    # cp ./dist/* /opt/graphscope/dist/ && \
+    pip install dist/*.whl
+
+RUN rm -f /dev/null && mknod -m 666 /dev/null c 1 3 \
+  && mkdir /var/run/sshd \
+  && echo 'root:123456' | chpasswd \
+  && sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
+  && sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd \
+  && echo "export VISIBLE=now" >> /etc/profile \
+  && echo 'admin:123456' | chpasswd \
+  && mkdir /home/admin/.ssh && ssh-keygen -f /home/admin/.ssh/id_rsa -N "" \
+  && chown -R admin:admin /home/admin/.ssh \
+  && ssh-keygen -t dsa -f /etc/ssh/ssh_host_dsa_key -N "" && chmod 600 /etc/ssh/ssh_host_dsa_key \
+  && ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N "" && chmod 600 /etc/ssh/ssh_host_rsa_key \
+  && echo '%admin ALL=(ALL) NOPASSWD:SETENV:ALL' >> /etc/sudoers
+
+RUN /bin/cp -f /home/admin/.ssh/id_rsa.pub /home/admin/.ssh/authorized_keys && \
+    /bin/cp -rf /home/admin/.ssh /root/.ssh && \
+    chmod 700 /root/.ssh && \
+    chmod 600 /root/.ssh/* 
+
+

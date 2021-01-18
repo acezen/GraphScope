@@ -272,7 +272,7 @@ class Session(object):
         # update other optional params
         self._config_params.update(kw)
 
-        self._config_params["addr"] = None
+        self._config_params["addr"] = kw.pop("addr", None)
 
         # Reserved keyword for local testing.
         run_on_local = kw.pop("run_on_local", False)
