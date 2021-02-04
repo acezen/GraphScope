@@ -124,6 +124,7 @@ class CoordinatorServiceServicer(
             self._launcher._analytical_engine_endpoint = GS_DEBUG_ENDPOINT
         else:
             if not self._launcher.start():
+                logger.error("Failed to launch engine: ...")
                 raise RuntimeError("Coordinator Launching failed.")
 
         self._launcher_type = self._launcher.type()
@@ -154,6 +155,10 @@ class CoordinatorServiceServicer(
                 interval=self._dangling_seconds, function=self._cleanup, args=(True,)
             )
             self._dangling_detecting_timer.start()
+
+        # run step caches
+        self._running_step = None
+        self._running_step_thread = None
 
         atexit.register(self._cleanup)
 
@@ -225,6 +230,49 @@ class CoordinatorServiceServicer(
             )
 
     def RunStep(self, request, context):  # noqa: C901
+        if request.tag:
+            # in lazy mode
+            if self._running_step == None:
+                # run and return
+                def run_the_step(target, req, ctx):
+                    response = target.RunStepImpl(req, ctx)
+                    target._running_step = (req.tag, response)
+                self._running_step = request.tag
+                self._running_step_thread = threading.Thread(
+                        target=run_the_step, args=(self, request, context))
+                self._running_step_thread.start()
+                return self._make_response(
+                        message_pb2.RunStepResponse,
+                        error_codes_pb2.UNKNOWN,
+                        "running")
+            elif self._running_step == request.tag:
+                # return running status
+                return self._make_response(
+                        message_pb2.RunStepResponse,
+                        error_codes_pb2.UNKNOWN,
+                        "running")
+            elif isinstance(self._running_step, str):
+                # return pending status
+                return self._make_response(
+                        message_pb2.RunStepResponse,
+                        error_codes_pb2.UNKNOWN,
+                        "pending")
+            elif isinstance(self._running_step, tuple) and self._running_step[0] == request.tag:
+                # result ready
+                response = self._running_step[1]
+                self._running_step = None
+                return response
+            else:
+                # mismatch
+                self._running_step = None
+                return self._make_response(
+                        message_pb2.RunStepResponse,
+                        error_codes_pb2.UNKNOWN,
+                        "The requested dag def and the result is not matched, please try again")
+        else:
+            return self.RunStepImpl(request, context)
+
+    def RunStepImpl(self, request, context):  # noqa: C901
         # only one op in one step is allowed.
         if len(request.dag_def.op) != 1:
             return self._make_response(

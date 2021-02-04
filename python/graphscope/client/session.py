@@ -43,6 +43,7 @@ except ImportError:
 
 import graphscope
 from graphscope.client.rpc import GRPCClient
+from graphscope.client.rpc import GRPCGatewayClient
 from graphscope.client.utils import CaptureKeyboardInterrupt
 from graphscope.client.utils import GSLogger
 from graphscope.client.utils import set_defaults
@@ -731,7 +732,10 @@ class Session(object):
             raise RuntimeError("Session initialize failed.")
 
         # waiting service ready
-        self._grpc_client = GRPCClient(endpoint)
+        if endpoint.startswith("http://") or endpoint.startswith("https://"):
+            self._grpc_client = GRPCGatewayClient(endpoint)
+        else:
+            self._grpc_client = GRPCClient(endpoint)
         self._grpc_client.waiting_service_ready(
             timeout_seconds=self._config_params["timeout_seconds"],
             enable_k8s=self._config_params["enable_k8s"],
