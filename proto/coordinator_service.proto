@@ -16,6 +16,8 @@
 syntax = "proto3";
 package gs.rpc;
 
+option go_package = "github.com/alibaba/GraphScope/coodrinator/gateway/gen/go;proto";
+
 import "proto/message.proto";
 
 service CoordinatorService {
