@@ -52,9 +52,10 @@ class LPAU2I : public PropertyAppBase<FRAG_T, LPAU2IContext<FRAG_T>> {
       for (auto u : inner_vertices) {
         if (v_label == 0) {
           label_t vdata;
-          for (auto prop_id = 0u; prop_id < prop_num; prop_id++) {
-            vdata.push_back(frag.template GetData<double>(u, prop_id));
-          }
+          // for (auto prop_id = 0u; prop_id < prop_num; prop_id++) {
+          //  vdata.push_back(frag.template GetData<double>(u, prop_id));
+          // }
+          vdata.push_back(frag.template GetData<double>(u, 148))
           label[u] = vdata;
         } else {
           label[u].resize(prop_num, 0);
@@ -173,11 +174,10 @@ class LPAU2I : public PropertyAppBase<FRAG_T, LPAU2IContext<FRAG_T>> {
           label[v_label][u].clear();
           for (auto& e : ies) {
             auto v = e.neighbor();
-            auto edata = e.template get_data<edata_t>(0);
 
             for (auto prop_id = 0u; prop_id < prop_num; prop_id++) {
               label[v_label][u][prop_id] +=
-                  label[frag.vertex_label(v)][v][prop_id] * edata;
+                  label[frag.vertex_label(v)][v][prop_id] * 1.0;
             }
           }
         }
@@ -202,7 +202,7 @@ class LPAU2I : public PropertyAppBase<FRAG_T, LPAU2IContext<FRAG_T>> {
 
             for (auto prop_id = 0u; prop_id < prop_num; prop_id++) {
               inner_tmp_label[u][prop_id] +=
-                  label[frag.vertex_label(v)][v][prop_id] * edata;
+                  label[frag.vertex_label(v)][v][prop_id] * 1.0;
             }
           }
         }
