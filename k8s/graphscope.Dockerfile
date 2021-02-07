@@ -29,6 +29,7 @@ RUN cd /root/gs/learning_engine && \
     cmake -DCMAKE_PREFIX_PATH=/opt/graphscope \
           -DCMAKE_INSTALL_PREFIX=/opt/graphscope \
           -DWITH_VINEYARD=ON \
+          -DVINEYARD_USE_OID=OFF \
           -DTESTING=OFF .. && \
     make graphlearn_shared install -j
 
