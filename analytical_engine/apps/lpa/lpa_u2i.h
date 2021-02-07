@@ -43,6 +43,7 @@ class LPAU2I : public PropertyAppBase<FRAG_T, LPAU2IContext<FRAG_T>> {
              message_manager_t& messages) {
     auto v_label_num = frag.vertex_label_num();
     auto user_inner_vertices = frag.InnerVertices(0);
+    int prop_id = frag.schema.GetVertexPropertyId(0, "label");
 
     for (auto v_label = 0; v_label != v_label_num; ++v_label) {
       auto inner_vertices = frag.InnerVertices(v_label);
@@ -55,7 +56,7 @@ class LPAU2I : public PropertyAppBase<FRAG_T, LPAU2IContext<FRAG_T>> {
           // for (auto prop_id = 0u; prop_id < prop_num; prop_id++) {
           //  vdata.push_back(frag.template GetData<double>(u, prop_id));
           // }
-          vdata.push_back(frag.template GetData<double>(u, 148))
+          vdata.push_back(frag.template GetData<double>(u, prop_id));
           label[u] = vdata;
         } else {
           label[u].resize(prop_num, 0);
@@ -97,7 +98,6 @@ class LPAU2I : public PropertyAppBase<FRAG_T, LPAU2IContext<FRAG_T>> {
 
         for (auto& e : ies) {
           auto v = e.neighbor();
-
           if (frag.IsOuterVertex(v)) {
             messages.SyncStateOnOuterVertex(frag, v, ctx.in_degree[v_label][u]);
           }
@@ -198,8 +198,6 @@ class LPAU2I : public PropertyAppBase<FRAG_T, LPAU2IContext<FRAG_T>> {
           inner_tmp_label[u].resize(prop_num, 0);
           for (auto& e : oes) {
             auto v = e.neighbor();
-            auto edata = e.template get_data<edata_t>(0);
-
             for (auto prop_id = 0u; prop_id < prop_num; prop_id++) {
               inner_tmp_label[u][prop_id] +=
                   label[frag.vertex_label(v)][v][prop_id] * 1.0;
