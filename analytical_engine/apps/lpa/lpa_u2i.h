@@ -43,7 +43,7 @@ class LPAU2I : public PropertyAppBase<FRAG_T, LPAU2IContext<FRAG_T>> {
              message_manager_t& messages) {
     auto v_label_num = frag.vertex_label_num();
     auto user_inner_vertices = frag.InnerVertices(0);
-    int prop_id = frag.schema.GetVertexPropertyId(0, "label");
+    int prop_id = frag.schema().GetVertexPropertyId(0, "label");
 
     for (auto v_label = 0; v_label != v_label_num; ++v_label) {
       auto inner_vertices = frag.InnerVertices(v_label);
