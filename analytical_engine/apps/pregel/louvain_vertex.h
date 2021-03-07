@@ -1,0 +1,138 @@
+#ifndef ANALYTICAL_ENGINE_CORE_APP_PREGEL_LOUVAIN_VERTEX_H_
+#define ANALYTICAL_ENGINE_CORE_APP_PREGEL_LOUVAIN_VERTEX_H_
+
+#include <list>
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "core/app/pregel/pregel_vertex.h"
+
+namespace gs {
+
+template <typename FRAG_T, typename VD_T, typename MD_T>
+class LouvainVertex : public PregelVertex<FRAG_T, VD_T, MD_T> {
+  using fragment_t = FRAG_T;
+  using vertex_t = typename fragment_t::vertex_t;
+  using adj_list_t = typename fragment_t::const_adj_list_t;
+  using oid_t = typename fragment_t::oid_t;
+  using vid_t = typename fragment_t::vid_t;
+  using edata_t = typename fragment_t::edata_t;
+
+ public:
+  using vd_t = VD_T;
+  using md_t = MD_T;
+
+  std::string id() { return std::to_string(fragment_->GetId(vertex_)); }
+
+  void set_value(const VD_T& value) {
+    compute_context_->set_vertex_value(*this, value);
+  }
+  void set_value(const VD_T&& value) {
+    compute_context_->set_vertex_value(*this, std::move(value));
+  }
+
+  const VD_T& value() { return compute_context_->get_vertex_value(*this); }
+
+  vertex_t vertex() const { return vertex_; }
+
+  adj_list_t outgoing_edges() { return fragment_->GetOutgoingAdjList(vertex_); }
+
+  adj_list_t incoming_edges() { return fragment_->GetIncomingAdjList(vertex_); }
+
+  void send(const vertex_t& v, const MD_T& value) {
+    compute_context_->send_message(v, value);
+  }
+
+  void send(const vertex_t& v, MD_T&& value) {
+    compute_context_->send_message(v, std::move(value));
+  }
+
+  void vote_to_halt() { compute_context_->vote_to_halt(*this); }
+
+  void set_fragment(const fragment_t* fragment) { fragment_ = fragment; }
+
+  void set_compute_context(
+      PregelComputeContext<fragment_t, VD_T, MD_T>* compute_comtext) {
+    compute_context_ = compute_comtext;
+  }
+
+  void set_vertex(vertex_t vertex) { vertex_ = vertex; }
+  VD_T& ref_value() {
+    return compute_context_->vertex_data()[vertex_];
+  }
+
+  vid_t gid() {
+    return fragment_->Vertex2Gid(vertex_);
+  }
+
+  vid_t get_vertex_gid(const vertex_t& v) { return fragment_->Vertex2Gid(v); }
+
+  void send_by_id(const oid_t& dst_id, const md_t& md) {
+    vertex_t v;
+    fragment_->GetVertex(dst_id, v);
+    this->send(v, md);
+  }
+
+  void send_by_gid(vid_t dst_gid, const md_t& md) {
+    vertex_t v;
+    // LOG(INFO) << "get gid: " << dst_gid;
+    fragment_->Gid2Vertex(dst_gid, v);
+    this->send(v, md);
+  }
+
+  size_t edge_size() {
+    if (!use_fake_edges()) {
+      return this->incoming_edges().Size() + this->outgoing_edges().Size();
+    } else {
+      return fake_edges().size();
+    }
+  }
+
+  bool use_fake_edges() {
+    return compute_context_->vertex_data()[vertex_].use_fake_edges();
+  }
+
+  const std::map<vid_t, edata_t>& fake_edges() const {
+    return compute_context_->vertex_data()[vertex_].get_fake_edges();
+  }
+
+  // TODO: const reference
+  edata_t get_edge_value(const vid_t& dst_id) {
+    if (!use_fake_edges()) {
+      for (auto& edge : this->incoming_edges()) {
+        if (fragment_->Vertex2Gid(edge.neighbor) == dst_id) {
+          return edge.get_data();
+        }
+      }
+      for (auto& edge : this->outgoing_edges()) {
+        if (fragment_->Vertex2Gid(edge.neighbor) == dst_id) {
+          return edge.get_data();
+        }
+      }
+    } else {
+      return fake_edges().at(dst_id);
+    }
+    return edata_t();
+  }
+
+  void set_fake_edges(std::map<vid_t, edata_t>&& edges) {
+    compute_context_->vertex_data()[vertex_].set_fake_edges(edges);
+    compute_context_->vertex_data()[vertex_].set_use_fake_edges(true);
+  }
+
+  std::vector<vid_t>& nodes_in_self_community() {
+    return compute_context_->vertex_data()[vertex_].get_nodes_in_community();
+  }
+
+ public:
+  const fragment_t* fragment_;
+  PregelComputeContext<fragment_t, VD_T, MD_T>* compute_context_;
+
+  vertex_t vertex_;
+
+};
+}  // namespace gs
+
+#endif  // ANALYTICAL_ENGINE_CORE_APP_PREGEL_LOUVAIN_VERTEX_H_

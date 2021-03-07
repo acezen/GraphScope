@@ -23,6 +23,8 @@ limitations under the License.
 
 #include "grape/utils/iterator_pair.h"
 
+#include "core/app/pregel/aggregators/aggregator.h"
+#include "core/app/pregel/aggregators/aggregator_factory.h"
 #include "core/app/pregel/pregel_vertex.h"
 
 namespace gs {
@@ -69,6 +71,8 @@ class PregelComputeContext {
 
   int superstep() const { return step_; }
 
+  void set_superstep(int step) { step_ = step; }
+
   void set_vertex_value(const pregel_vertex_t& vertex, const VD_T& value) {
     vertex_data_[vertex.vertex()] = value;
   }
@@ -89,7 +93,7 @@ class PregelComputeContext {
         message_manager_->SyncStateOnOuterVertex<fragment_t, MD_T>(*fragment_,
                                                                    v, value);
       } else {
-        messages_in_[v].emplace_back(value);
+        messages_out_[v].emplace_back(value);
         has_messages_ = true;
       }
     }
@@ -103,7 +107,7 @@ class PregelComputeContext {
         message_manager_->SyncStateOnOuterVertex<fragment_t, MD_T>(*fragment_,
                                                                    v, value);
       } else {
-        messages_in_[v].emplace_back(std::move(value));
+        messages_out_[v].emplace_back(std::move(value));
         has_messages_ = true;
       }
     }
@@ -134,16 +138,20 @@ class PregelComputeContext {
     }
   }
 
-  bool active(const vertex_t& v) { return !messages_in_[v].empty(); }
+  bool active(const vertex_t& v) { return !halted_[v]; }
 
   void activate(const vertex_t& v) {
-    halted_[v] = false;
-    --voted_to_halt_num_;
+    if (halted_[v] == true) {
+      halted_[v] = false;
+      --voted_to_halt_num_;
+    }
   }
 
   void vote_to_halt(const pregel_vertex_t& vertex) {
-    // halted_[vertex.vertex()] = true;
-    // ++voted_to_halt_num_;
+    if (halted_[vertex.vertex()] == false) {
+      halted_[vertex.vertex()] = true;
+      ++voted_to_halt_num_;
+    }
   }
 
   bool all_halted() { return voted_to_halt_num_ == inner_vertex_num_; }
@@ -161,7 +169,18 @@ class PregelComputeContext {
   typename FRAG_T::template vertex_array_t<VD_T>& vertex_data() {
     return vertex_data_;
   }
-  void clear_for_next_round() { has_messages_ = false; }
+  void clear_for_next_round() {
+    if (!enable_combine_) {
+      auto inner_vertices = fragment_->InnerVertices();
+      for (auto v : inner_vertices) {
+        messages_in_[v].clear();
+        messages_in_[v].swap(messages_out_[v]);
+        if (!messages_in_[v].empty()) {
+            activate(v);
+        }
+      }
+    }
+  }
 
   void enable_combine() { enable_combine_ = true; }
   void set_fragment(const fragment_t* fragment) { fragment_ = fragment; }
@@ -182,6 +201,32 @@ class PregelComputeContext {
     } else {
       return "";
     }
+  }
+
+  std::unordered_map<std::string, std::shared_ptr<IAggregator>>& aggregators() {
+    return aggregators_;
+  }
+
+  void register_aggregator(const std::string& name, PregelAggregatorType type) {
+    if (aggregators_.find(name) == aggregators_.end()) {
+      aggregators_.emplace(name, AggregatorFactory::CreateAggregator(type));
+      aggregators_.at(name)->Init();
+    }
+  }
+
+  template <typename AGGR_TYPE>
+  void aggregate(const std::string& name, AGGR_TYPE value) {
+    if (aggregators_.find(name) != aggregators_.end()) {
+      std::dynamic_pointer_cast<Aggregator<AGGR_TYPE>>(aggregators_.at(name))
+          ->Aggregate(value);
+    }
+  }
+
+  template <typename AGGR_TYPE>
+  AGGR_TYPE get_aggregated_value(const std::string& name) {
+    return std::dynamic_pointer_cast<Aggregator<AGGR_TYPE>>(
+               aggregators_.at(name))
+        ->GetAggregatedValue();
   }
 
  private:
@@ -205,6 +250,7 @@ class PregelComputeContext {
 
   int step_;
   std::unordered_map<std::string, std::string> config_;
+  std::unordered_map<std::string, std::shared_ptr<IAggregator>> aggregators_;
 };
 
 }  // namespace gs

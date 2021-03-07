@@ -31,6 +31,8 @@
 #include "apps/pregel/pagerank_pregel.h"
 #include "apps/pregel/sssp_pregel.h"
 #include "apps/pregel/tc_pregel.h"
+#include "apps/pregel/louvain.h"
+#include "apps/pregel/louvain_pregel.h"
 #include "core/app/pregel/pregel_app_base.h"
 #include "core/loader/arrow_fragment_loader.h"
 
@@ -106,6 +108,27 @@ void RunTC(grape::CommSpec const& comm_spec, std::string& efile,
   RunPregelApp<GraphType, AppType>(fragment, comm_spec, query, output_prefix);
 }
 
+void RunLouvain(grape::CommSpec const& comm_spec, std::string& efile,
+           std::string& vfile, const std::string& query,
+           std::string& output_prefix) {
+  using GraphType =
+      grape::ImmutableEdgecutFragment<int64_t, uint32_t, grape::EmptyType,
+                                      int64_t,
+                                      grape::LoadStrategy::kOnlyOut>;
+  using AppType = gs::LouvainPregel<GraphType, gs::PregelLouvain<GraphType>>;
+  auto load_spec = grape::DefaultLoadGraphSpec();
+
+  load_spec.set_directed(false);
+
+  auto fragment =
+      grape::LoadGraph<GraphType,
+                       grape::SegmentedPartitioner<typename GraphType::oid_t>>(
+          efile, vfile, comm_spec, load_spec);
+
+  printf("start run pregel louvain app.\n");
+  RunPregelApp<GraphType, AppType>(fragment, comm_spec, query, output_prefix);
+}
+
 int main(int argc, char** argv) {
   if (argc != 5 && argc < 7) {
     printf("usage: ./run_pregel_app tc <efile> <vfile> <output_prefix>\n");
@@ -124,6 +147,9 @@ int main(int argc, char** argv) {
     if (app_name == "tc") {
       std::string efile = argv[2], vfile = argv[3], output_prefix = argv[4];
       RunTC(comm_spec, efile, vfile, "", output_prefix);
+    } else if (app_name == "louvain") {
+      std::string efile = argv[2], vfile = argv[3], output_prefix = argv[4];
+      RunLouvain(comm_spec, efile, vfile, "{\"tolerance\": 3, \"min_progress\": 1}", output_prefix);
     } else {
       int index = 1;
       std::string ipc_socket = std::string(argv[index++]);
