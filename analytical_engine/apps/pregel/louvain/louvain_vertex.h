@@ -117,12 +117,12 @@ class LouvainVertex : public PregelVertex<FRAG_T, VD_T, MD_T> {
   edata_t get_edge_value(const vid_t& dst_id) {
     if (!use_fake_edges()) {
       for (auto& edge : this->incoming_edges()) {
-        if (fragment_->Vertex2Gid(edge.neighbor) == dst_id) {
+        if (fragment_->Vertex2Gid(edge.get_neighbor()) == dst_id) {
           return edge.get_data();
         }
       }
       for (auto& edge : this->outgoing_edges()) {
-        if (fragment_->Vertex2Gid(edge.neighbor) == dst_id) {
+        if (fragment_->Vertex2Gid(edge.get_neighbor()) == dst_id) {
           return edge.get_data();
         }
       }

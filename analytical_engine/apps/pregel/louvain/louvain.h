@@ -46,7 +46,7 @@ class PregelLouvain
   using md_t = LouvainMessage<vid_t, edata_t>;
   using pregel_vertex_t = LouvainVertex<fragment_t, vd_t, md_t>;
   using compute_context_t = PregelComputeContext<fragment_t, vd_t, md_t>;
-  using comm_id_type = uint32_t;
+  using comm_id_type = vid_t;
 
  public:
   void Init(pregel_vertex_t& v, compute_context_t& context) override {
@@ -229,13 +229,13 @@ class PregelLouvain
         md_t out_message(state.get_community(),
                          state.get_community_sigma_total(), edge.get_data(),
                          vertex.gid());
-        vertex.send(edge.neighbor, out_message);
+        vertex.send(edge.get_neighbor(), out_message);
       }
       for (auto& edge : vertex.outgoing_edges()) {
         md_t out_message(state.get_community(),
                          state.get_community_sigma_total(), edge.get_data(),
                          vertex.gid());
-        vertex.send(edge.neighbor, out_message);
+        vertex.send(edge.get_neighbor(), out_message);
       }
     }
   }
@@ -425,10 +425,10 @@ class PregelLouvain
     } else {
       LOG(ERROR) << "Not supposed to be here.";
       for (auto& edge : vertex.incoming_edges()) {
-        edges[vertex.get_vertex_gid(edge.neighbor)] = edge.get_data();
+        edges[vertex.get_vertex_gid(edge.get_neighbor())] = edge.get_data();
       }
       for (auto& edge : vertex.outgoing_edges()) {
-        edges[vertex.get_vertex_gid(edge.neighbor)] = edge.get_data();
+        edges[vertex.get_vertex_gid(edge.get_neighbor())] = edge.get_data();
       }
     }
     message.set_edges(std::move(edges));

@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
       RunTC(comm_spec, efile, vfile, "", output_prefix);
     } else if (app_name == "louvain") {
       std::string efile = argv[2], vfile = argv[3], output_prefix = argv[4];
-      RunLouvain(comm_spec, efile, vfile, "{\"tolerance\": 3, \"min_progress\": 1}", output_prefix);
+      RunLouvain(comm_spec, efile, vfile, "{\"tolerance\": 3, \"min_progress\": 1000}", output_prefix);
     } else {
       int index = 1;
       std::string ipc_socket = std::string(argv[index++]);
