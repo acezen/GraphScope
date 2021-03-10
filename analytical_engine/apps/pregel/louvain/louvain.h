@@ -131,7 +131,7 @@ class PregelLouvain
         current_iteration % 2 == 0) {
       vertex_value.set_changed(0);  // change count is per pass
       int64_t total_change = context.template get_aggregated_value<int64_t>(CHANGE_AGG);
-      LOG(INFO) << v.gid() << " get aggregate change " << total_change;
+      // LOG(INFO) << v.gid() << " get aggregate change " << total_change;
       vertex_value.add_change_history(total_change);
 
       // if halting aggregate q value and replace node edges with community edges
@@ -157,7 +157,7 @@ class PregelLouvain
       // in the next step will require a progress check, aggregate the number of
       // nodes who have changed community.
       if (current_iteration > 0 && current_iteration % 2 == 0) {
-        LOG(INFO) << v.gid() << " aggregate change " << vertex_value.get_changed();
+        // LOG(INFO) << v.gid() << " aggregate change " << vertex_value.get_changed();
         context.aggregate(CHANGE_AGG, vertex_value.get_changed());
       }
       break;

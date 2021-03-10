@@ -38,15 +38,15 @@ namespace gs {
  * @brief This class is a specialized PregelAppBase for louvain.
  * @tparam FRAG_T
  */
-template <typename FRAG_T>
+template <typename FRAG_T, typename VERTEX_PROGRAM_T = PregelLouvain<FRAG_T>>
 class LouvainAppBase
     : public AppBase<
           FRAG_T,
           LouvainContext<FRAG_T, PregelComputeContext<
-                                    FRAG_T, typename PregelLouvain<FRAG_T>::vd_t,
-                                    typename PregelLouvain<FRAG_T>::md_t>>>,
+                                    FRAG_T, typename VERTEX_PROGRAM_T::vd_t,
+                                    typename VERTEX_PROGRAM_T::md_t>>>,
       public grape::Communicator {
-  using vertex_program_t = PregelLouvain<FRAG_T>;
+  using vertex_program_t = VERTEX_PROGRAM_T;
   using vd_t = typename vertex_program_t::vd_t;
   using md_t = typename vertex_program_t::md_t;
   using pregel_compute_context_t = PregelComputeContext<FRAG_T, vd_t, md_t>;
@@ -119,12 +119,23 @@ class LouvainAppBase
               << " current iteration: " << current_iteration;
 
     {
-      // get message
-      vertex_t v(0);
-      md_t msg;
-      while (messages.GetMessage<fragment_t, md_t>(frag, v, msg)) {
-        assert(frag.IsInnerVertex(v));
-        ctx.compute_context_.messages_in()[v].emplace_back(std::move(msg));
+      if (current_super_step == -9) {
+        std::pair<vid_t, vid_t> msg;
+        while (messages.GetMessage<std::pair<vid_t, vid_t>>(msg)) {
+          vertex_t v;
+          vid_t v_vid = msg.first;
+          vid_t comm_id = msg.second;
+          frag.Gid2Vertex(v_vid, v);
+          ctx.compute_context_.vertex_data()[v].set_community(comm_id);
+        }
+      } else {
+        // get message
+        vertex_t v(0);
+        md_t msg;
+        while (messages.GetMessage<fragment_t, md_t>(frag, v, msg)) {
+          assert(frag.IsInnerVertex(v));
+          ctx.compute_context_.messages_in()[v].emplace_back(std::move(msg));
+        }
       }
     }
 
@@ -148,7 +159,7 @@ class LouvainAppBase
       LOG(INFO) << "[INFO]: superstep: " << current_super_step
                 << " pass: " << current_iteration / 2
                 << " totalChange: " << totalChange;
-    } else if (ctx.halt) {
+    } else if (ctx.halt && current_super_step != -9) {
       double actualQ =
           ctx.compute_context_.template get_aggregated_value<double>(
               ACTUAL_Q_AGG);
@@ -181,6 +192,7 @@ class LouvainAppBase
       }
     }
 
+    if (current_super_step != -9) {
     for (auto v : inner_vertices) {
       if (ctx.compute_context_.active(v)) {
         pregel_vertex.set_vertex(v);
@@ -193,6 +205,7 @@ class LouvainAppBase
       } else if (ctx.compute_context_.superstep() == -1) {
         ctx.compute_context_.vertex_data()[v].set_alived_community(false);
       }
+    }
     }
 
     {
@@ -212,6 +225,10 @@ class LouvainAppBase
     ctx.compute_context_.clear_for_next_round();
     if (!ctx.compute_context_.all_halted()) {
       messages.ForceContinue();
+    } else if (current_super_step != -9) {
+      ctx.compute_context_.set_superstep(-10);
+      // when all computation done, sync community from hub to all members.
+      ctx.SyncCommunity(messages);
     }
   }
 

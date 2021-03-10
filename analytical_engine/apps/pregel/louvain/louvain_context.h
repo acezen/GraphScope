@@ -22,6 +22,7 @@ class LouvainContext
                                       typename COMPUTE_CONTEXT_T::vd_t> {
   using vid_t = typename FRAG_T::vid_t;
   using edata_t = typename FRAG_T::edata_t;
+  using vertex_t = typename FRAG_T::vertex_t;
   using vd_t = typename COMPUTE_CONTEXT_T::vd_t;
   using fragment_t = FRAG_T;
 
@@ -56,11 +57,40 @@ class LouvainContext
     auto& result = compute_context_.vertex_data();
     auto iv = frag.InnerVertices();
     for (auto v : iv) {
+      /*
       auto& list = result[v].get_nodes_in_community();
       if (!list.empty()) {
         auto community_id = frag.Gid2Oid(list.front());
         for (auto& gid : list) {
           os << frag.Gid2Oid(gid) << " " << community_id << std::endl;
+        }
+      }
+      */
+      os << frag.GetId(v) << " " << frag.Gid2Oid(result[v].get_community()) << std::endl;
+    }
+  }
+
+  void SyncCommunity(grape::DefaultMessageManager& messages) {
+    vineyard::IdParser<vid_t> vid_parser;
+    auto& frag = this->fragment();
+    auto& result = compute_context_.vertex_data();
+    auto iv = frag.InnerVertices();
+    for (auto v : iv) {
+      auto& list = result[v].get_nodes_in_community();
+      if (!list.empty()) {
+        auto community_id = list.front();
+        for (auto& gid : list) {
+          auto fid = vid_parser.GetFid(gid);
+          vertex_t lv;
+          if (fid == frag.fid()) {
+            frag.InnerVertexGid2Vertex(gid, lv);
+            result[lv].set_community(community_id);
+          } else {
+            messages.SendToFragment(
+              fid,
+              std::pair<vid_t, vid_t>(gid, community_id)
+            );
+          }
         }
       }
     }

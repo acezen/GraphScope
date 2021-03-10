@@ -34,18 +34,17 @@ namespace gs {
 template <typename VID_T, typename EDATA_T>
 class LouvainNodeState {
   using vid_t = VID_T;
-  using comm_id_type = VID_T;
   using edata_t = EDATA_T;
 
  private:
-  comm_id_type community_ = 0;
+  vid_t community_ = 0;
   edata_t community_sigma_total_;
 
   // the internal edge weight of a node
-  // i.e. edges from the node to itself.
+  // i.e. edges weight from the node to itself.
   edata_t internal_weight_;
 
-  // outgoing degree of the node
+  // degree of the node
   edata_t node_weight_;
 
   // 1 if the node has changed communities this cycle, otherwise 0
@@ -67,9 +66,13 @@ class LouvainNodeState {
         internal_weight_(0),
         node_weight_(0),
         changed_(0) {}
-  const comm_id_type& get_community() const { return community_; }
-  void set_community(const comm_id_type& community) { community_ = community; }
+
+  const vid_t get_community() const { return community_; }
+
+  void set_community(const vid_t& community) { community_ = community; }
+
   edata_t get_community_sigma_total() const { return community_sigma_total_; }
+
   void set_community_sigma_total(edata_t community_sigma_total) {
     community_sigma_total_ = community_sigma_total;
   }
@@ -110,6 +113,11 @@ class LouvainNodeState {
 
   void set_fake_edges(const std::map<vid_t, edata_t>& edges) {
     fake_edges_ = edges;
+  }
+
+  friend grape::InArchive& operator<<(grape::InArchive& in_archive,
+                                      const LouvainNodeState& u) {
+    in_archive << u.community_;
   }
 
   std::vector<vid_t>& get_nodes_in_community() { return nodes_in_community_; }
