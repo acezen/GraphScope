@@ -1,5 +1,5 @@
-#ifndef ANALYTICAL_ENGINE_CORE_APP_PREGEL_LOUVAIN_CONTEXT_H_
-#define ANALYTICAL_ENGINE_CORE_APP_PREGEL_LOUVAIN_CONTEXT_H_
+#ifndef ANALYTICAL_ENGINE_APPS_PREGEL_LOUVAIN_LOUVAIN_CONTEXT_H_
+#define ANALYTICAL_ENGINE_APPS_PREGEL_LOUVAIN_LOUVAIN_CONTEXT_H_
 
 #include <list>
 #include <map>
@@ -66,24 +66,6 @@ class LouvainContext
     }
   }
 
-  bool decide_to_halt(const std::vector<int64_t>& history, int tolerance,
-                      int min_progress) {
-    // Halt if the most recent change was 0
-    if (0 == history.back()) {
-      return true;
-    }
-    // Halt if the change count has increased tolerant times
-    int64_t previous = history.front();
-    int count = 0;
-    for (auto& cur : history) {
-      if (cur >= previous - min_progress) {
-        count++;
-      }
-      previous = cur;
-    }
-    return (count > tolerance);
-  }
-
   std::vector<int64_t> change_history;
   bool halt = false;  // stage 1
   COMPUTE_CONTEXT_T compute_context_;
@@ -92,4 +74,4 @@ class LouvainContext
 
 }  // namespace gs
 
-#endif  // ANALYTICAL_ENGINE_CORE_APP_PREGEL_LOUVAIN_CONTEXT_H_
+#endif  // ANALYTICAL_ENGINE_APPS_PREGEL_LOUVAIN_LOUVAIN_CONTEXT_H_

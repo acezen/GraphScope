@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef ANALYTICAL_ENGINE_CORE_APP_PREGEL_LOUVAIN_PREGEL_H_
-#define ANALYTICAL_ENGINE_CORE_APP_PREGEL_LOUVAIN_PREGEL_H_
+#ifndef ANALYTICAL_ENGINE_APPS_PREGEL_LOUVAIN_LOUVAIN_APP_BASE_H_
+#define ANALYTICAL_ENGINE_APPS_PREGEL_LOUVAIN_LOUVAIN_APP_BASE_H_
 
 #include <map>
 #include <memory>
@@ -27,13 +27,19 @@ limitations under the License.
 #include "core/app/app_base.h"
 #include "core/app/pregel/pregel_compute_context.h"
 
-#include "apps/pregel/louvain_context.h"
-#include "apps/pregel/louvain_vertex.h"
+#include "apps/pregel/louvain/auxiliary.h"
+#include "apps/pregel/louvain/louvain_context.h"
+#include "apps/pregel/louvain/louvain_vertex.h"
 
 namespace gs {
 
+/**
+ * @brief This class is a specialized PregelAppBase for louvain.
+ * @tparam FRAG_T
+ * @tparam VERTEX_PROGRAM_T
+ */
 template <typename FRAG_T, typename VERTEX_PROGRAM_T>
-class LouvainPregel
+class LouvainAppBase
     : public AppBase<
           FRAG_T,
           LouvainContext<FRAG_T, PregelComputeContext<
@@ -43,22 +49,21 @@ class LouvainPregel
   using vd_t = typename VERTEX_PROGRAM_T::vd_t;
   using md_t = typename VERTEX_PROGRAM_T::md_t;
   using pregel_compute_context_t = PregelComputeContext<FRAG_T, vd_t, md_t>;
-  using app_t = LouvainPregel<FRAG_T, VERTEX_PROGRAM_T>;
+  using app_t = LouvainAppBase<FRAG_T, VERTEX_PROGRAM_T>;
   using pregel_context_t = LouvainContext<FRAG_T, pregel_compute_context_t>;
+
   INSTALL_DEFAULT_WORKER(app_t, pregel_context_t, FRAG_T)
 
  public:
-  explicit LouvainPregel(const VERTEX_PROGRAM_T& program = VERTEX_PROGRAM_T())
-        : program_(program) {}
-
   using vid_t = typename fragment_t::vid_t;
   using vertex_t = typename fragment_t::vertex_t;
+
+  explicit LouvainAppBase(const VERTEX_PROGRAM_T& program = VERTEX_PROGRAM_T())
+        : program_(program) {}
 
   void PEval(const fragment_t& frag, pregel_context_t& ctx,
              message_manager_t& messages) {
     // superstep is 0 in PEval
-    // ctx.compute_context_.enable_combine();
-
     LouvainVertex<fragment_t, vd_t, md_t> pregel_vertex;
     pregel_vertex.set_fragment(&frag);
     pregel_vertex.set_compute_context(&ctx.compute_context_);
@@ -129,9 +134,10 @@ class LouvainPregel
     if (current_minor_step == 1 && current_iteration > 0 &&
         current_iteration % 2 == 0) {
       int64_t totalChange =
-          ctx.compute_context_.template get_aggregated_value<int64_t>("change_aggregator");
+          ctx.compute_context_.template get_aggregated_value<int64_t>(
+              CHANGE_AGG);
       ctx.change_history.push_back(totalChange);
-      ctx.halt = ctx.decide_to_halt(
+      ctx.halt = decide_to_halt(
           ctx.change_history,
           std::stoi(ctx.compute_context_.get_config("tolerance")),
           std::stoi(ctx.compute_context_.get_config("min_progress")));
@@ -143,7 +149,8 @@ class LouvainPregel
                 << " totalChange: " << totalChange;
     } else if (ctx.halt) {
       double actualQ =
-          ctx.compute_context_.template get_aggregated_value<double>("actual_q_aggregator");
+          ctx.compute_context_.template get_aggregated_value<double>(
+              ACTUAL_Q_AGG);
       // after one pass if already decided halt, that means stage 1 yield no
       // changes, so we halt stage 2.
       if (current_super_step <= 14 || actualQ <= ctx.previous_q) {
@@ -165,7 +172,8 @@ class LouvainPregel
     // communities node info.
     if (ctx.compute_context_.superstep() == -2) {
       for (auto& v : inner_vertices) {
-        bool is_alived_community = ctx.compute_context_.vertex_data()[v].is_alived_community();
+        bool is_alived_community =
+            ctx.compute_context_.vertex_data()[v].is_alived_community();
         if (is_alived_community) {
           ctx.compute_context_.activate(v);
         }
@@ -208,9 +216,7 @@ class LouvainPregel
 
  private:
   VERTEX_PROGRAM_T program_;
-  // COMBINATOR_T combinator_;
 };
-
 }  // namespace gs
 
-#endif  // ANALYTICAL_ENGINE_CORE_APP_PREGEL_LOUVAIN_PREGEL_H_
+#endif  // ANALYTICAL_ENGINE_APPS_PREGEL_LOUVAIN_LOUVAIN_APP_BASE_H_
