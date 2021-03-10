@@ -35,15 +35,15 @@ namespace gs {
 
 template <typename FRAG_T>
 class PregelLouvain
-    : public IPregelProgram<LouvainVertex<FRAG_T, LouvainNodeState, LouvainMessage>,
-                            PregelComputeContext<FRAG_T, LouvainNodeState, LouvainMessage>> {
+    : public IPregelProgram<LouvainVertex<FRAG_T, LouvainNodeState<typename FRAG_T::vid_t, typename FRAG_T::edata_t>, LouvainMessage<typename FRAG_T::vid_t, typename FRAG_T::edata_t>>,
+                            PregelComputeContext<FRAG_T, LouvainNodeState<typename FRAG_T::vid_t, typename FRAG_T::edata_t>, LouvainMessage<typename FRAG_T::vid_t, typename FRAG_T::edata_t>>> {
  public:
   using fragment_t = FRAG_T;
   using oid_t = typename fragment_t::oid_t;
   using vid_t = typename fragment_t::vid_t;
   using edata_t = typename fragment_t::edata_t;
-  using vd_t = LouvainNodeState;
-  using md_t = LouvainMessage;
+  using vd_t = LouvainNodeState<vid_t, edata_t>;
+  using md_t = LouvainMessage<vid_t, edata_t>;
   using pregel_vertex_t = LouvainVertex<fragment_t, vd_t, md_t>;
   using compute_context_t = PregelComputeContext<fragment_t, vd_t, md_t>;
   using comm_id_type = uint32_t;
@@ -105,7 +105,6 @@ class PregelLouvain
         vertex_value.set_node_weight(edge_weight_aggregation);
       }
       vertex_value.total_edge_weight = -1;
-      // LOG(INFO) << "superstep-" << current_super_step << " " << v.gid() << " aggregate total edge weight " << vertex_value.get_node_weight() + vertex_value.get_internal_weight();
       context.aggregate(TOTAL_EDGE_WEIGHT_AGG,
                         vertex_value.get_node_weight() + vertex_value.get_internal_weight());
     }
@@ -188,7 +187,6 @@ class PregelLouvain
     auto& vertex_value = v.ref_value();
     if (vertex_value.total_edge_weight == -1) {
       int64_t total_edge_weight = context.template get_aggregated_value<int64_t>(TOTAL_EDGE_WEIGHT_AGG);
-      // LOG(INFO) << "superstep-" << context.superstep() << " " << v.gid() << " get total edge weight " << total_edge_weight;
       vertex_value.total_edge_weight = total_edge_weight;
     }
     return vertex_value.total_edge_weight;

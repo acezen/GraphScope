@@ -29,6 +29,7 @@ limitations under the License.
 
 #include "apps/pregel/louvain/auxiliary.h"
 #include "apps/pregel/louvain/louvain_context.h"
+#include "apps/pregel/louvain/louvain.h"
 #include "apps/pregel/louvain/louvain_vertex.h"
 
 namespace gs {
@@ -36,20 +37,20 @@ namespace gs {
 /**
  * @brief This class is a specialized PregelAppBase for louvain.
  * @tparam FRAG_T
- * @tparam VERTEX_PROGRAM_T
  */
-template <typename FRAG_T, typename VERTEX_PROGRAM_T>
+template <typename FRAG_T>
 class LouvainAppBase
     : public AppBase<
           FRAG_T,
           LouvainContext<FRAG_T, PregelComputeContext<
-                                    FRAG_T, typename VERTEX_PROGRAM_T::vd_t,
-                                    typename VERTEX_PROGRAM_T::md_t>>>,
+                                    FRAG_T, typename PregelLouvain<FRAG_T>::vd_t,
+                                    typename PregelLouvain<FRAG_T>::md_t>>>,
       public grape::Communicator {
-  using vd_t = typename VERTEX_PROGRAM_T::vd_t;
-  using md_t = typename VERTEX_PROGRAM_T::md_t;
+  using vertex_program_t = PregelLouvain<FRAG_T>;
+  using vd_t = typename vertex_program_t::vd_t;
+  using md_t = typename vertex_program_t::md_t;
   using pregel_compute_context_t = PregelComputeContext<FRAG_T, vd_t, md_t>;
-  using app_t = LouvainAppBase<FRAG_T, VERTEX_PROGRAM_T>;
+  using app_t = LouvainAppBase<FRAG_T>;
   using pregel_context_t = LouvainContext<FRAG_T, pregel_compute_context_t>;
 
   INSTALL_DEFAULT_WORKER(app_t, pregel_context_t, FRAG_T)
@@ -58,7 +59,7 @@ class LouvainAppBase
   using vid_t = typename fragment_t::vid_t;
   using vertex_t = typename fragment_t::vertex_t;
 
-  explicit LouvainAppBase(const VERTEX_PROGRAM_T& program = VERTEX_PROGRAM_T())
+  explicit LouvainAppBase(const vertex_program_t& program = vertex_program_t())
         : program_(program) {}
 
   void PEval(const fragment_t& frag, pregel_context_t& ctx,
@@ -215,7 +216,7 @@ class LouvainAppBase
   }
 
  private:
-  VERTEX_PROGRAM_T program_;
+  vertex_program_t program_;
 };
 }  // namespace gs
 

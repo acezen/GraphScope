@@ -31,7 +31,6 @@
 #include "apps/pregel/pagerank_pregel.h"
 #include "apps/pregel/sssp_pregel.h"
 #include "apps/pregel/tc_pregel.h"
-#include "apps/pregel/louvain/louvain.h"
 #include "apps/pregel/louvain/louvain_app_base.h"
 #include "core/app/pregel/pregel_app_base.h"
 #include "core/loader/arrow_fragment_loader.h"
@@ -115,7 +114,7 @@ void RunLouvain(grape::CommSpec const& comm_spec, std::string& efile,
       grape::ImmutableEdgecutFragment<int64_t, uint32_t, grape::EmptyType,
                                       int64_t,
                                       grape::LoadStrategy::kOnlyOut>;
-  using AppType = gs::LouvainAppBase<GraphType, gs::PregelLouvain<GraphType>>;
+  using AppType = gs::LouvainAppBase<GraphType>;
   auto load_spec = grape::DefaultLoadGraphSpec();
 
   load_spec.set_directed(false);

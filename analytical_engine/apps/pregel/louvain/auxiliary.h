@@ -31,21 +31,22 @@ namespace gs {
 #define TOTAL_EDGE_WEIGHT_AGG "total_edge_weight_aggregator"
 #define ACTUAL_Q_AGG "actual_q_aggregator"
 
+template <typename VID_T, typename EDATA_T>
 class LouvainNodeState {
-  using comm_id_type = uint32_t;
-  using vid_t = uint32_t;
-  using edata_t = int64_t;
+  using vid_t = VID_T;
+  using comm_id_type = VID_T;
+  using edata_t = EDATA_T;
 
  private:
   comm_id_type community_ = 0;
-  int64_t community_sigma_total_;
+  edata_t community_sigma_total_;
 
   // the internal edge weight of a node
   // i.e. edges from the node to itself.
-  int64_t internal_weight_;
+  edata_t internal_weight_;
 
   // outgoing degree of the node
-  int64_t node_weight_;
+  edata_t node_weight_;
 
   // 1 if the node has changed communities this cycle, otherwise 0
   int64_t changed_ = 0;
@@ -68,16 +69,16 @@ class LouvainNodeState {
         changed_(0) {}
   const comm_id_type& get_community() const { return community_; }
   void set_community(const comm_id_type& community) { community_ = community; }
-  int64_t get_community_sigma_total() const { return community_sigma_total_; }
-  void set_community_sigma_total(int64_t community_sigma_total) {
+  edata_t get_community_sigma_total() const { return community_sigma_total_; }
+  void set_community_sigma_total(edata_t community_sigma_total) {
     community_sigma_total_ = community_sigma_total;
   }
-  int64_t get_internal_weight() const { return internal_weight_; }
-  void set_internal_weight(int64_t internal_weight) {
+  edata_t get_internal_weight() const { return internal_weight_; }
+  void set_internal_weight(edata_t internal_weight) {
     internal_weight_ = internal_weight;
   }
-  int64_t get_node_weight() const { return node_weight_; }
-  void set_node_weight(int64_t node_weight) { node_weight_ = node_weight; }
+  edata_t get_node_weight() const { return node_weight_; }
+  void set_node_weight(edata_t node_weight) { node_weight_ = node_weight; }
   int64_t get_changed() const { return changed_; }
   void set_changed(int64_t changed) { changed_ = changed; }
   const std::vector<int64_t>& get_change_history() const {
@@ -113,38 +114,41 @@ class LouvainNodeState {
 
   std::vector<vid_t>& get_nodes_in_community() { return nodes_in_community_; }
 
-  int64_t total_edge_weight = -1;
+  edata_t total_edge_weight = -1;
 };
 
+template <typename VID_T, typename EDATA_T>
 class LouvainMessage {
-  using comm_id_type = uint32_t;
+  using vid_t = VID_T;
+  using comm_id_type = VID_T;
+  using edata_t = EDATA_T;
 
  private:
   comm_id_type community_id_;
-  int64_t community_sigma_total_;
-  int64_t edge_weight_;
+  edata_t community_sigma_total_;
+  edata_t edge_weight_;
   comm_id_type source_id_;
 
   // For reconstruct graph info.
   // Each vertex send self's meta info to its community and silence it self,
   // the community compress its member's data and make self a new vertex for
   // next stage.
-  int64_t internal_weight_ = 0;
-  std::map<comm_id_type, int64_t> edges_;
+  edata_t internal_weight_ = 0;
+  std::map<comm_id_type, edata_t> edges_;
 
  public:
   std::vector<comm_id_type> nodes_in_self_community;
 
  public:
-  int64_t get_internal_weight() const { return internal_weight_; }
-  void set_internal_weight(int64_t internal_weight) {
+  edata_t get_internal_weight() const { return internal_weight_; }
+  void set_internal_weight(edata_t internal_weight) {
     internal_weight_ = internal_weight;
   }
-  const std::map<comm_id_type, int64_t>& get_edges() const { return edges_; }
-  void set_edges(const std::map<comm_id_type, int64_t>& edges) {
+  const std::map<comm_id_type, edata_t>& get_edges() const { return edges_; }
+  void set_edges(const std::map<comm_id_type, edata_t>& edges) {
     edges_ = edges;
   }
-  void set_edges(std::map<comm_id_type, int64_t>&& edges) { edges_ = edges; }
+  void set_edges(std::map<comm_id_type, edata_t>&& edges) { edges_ = edges; }
 
  public:
   LouvainMessage()
@@ -153,14 +157,14 @@ class LouvainMessage {
         edge_weight_(0),
         source_id_(0) {}
   LouvainMessage(const comm_id_type& community_id,
-                 int64_t community_sigma_total, int64_t edge_weight,
+                 edata_t community_sigma_total, edata_t edge_weight,
                  const comm_id_type& source_id)
       : community_id_(community_id),
         community_sigma_total_(community_sigma_total),
         edge_weight_(edge_weight),
         source_id_(source_id) {}
 
-  void add_to_sigma_total(int64_t partial) {
+  void add_to_sigma_total(edata_t partial) {
     community_sigma_total_ += partial;
   }
 
@@ -168,12 +172,12 @@ class LouvainMessage {
   void set_community_id(const comm_id_type& community_id) {
     community_id_ = community_id;
   }
-  int64_t get_community_sigma_total() const { return community_sigma_total_; }
-  void set_community_sigma_total(int64_t community_sigma_total) {
+  edata_t get_community_sigma_total() const { return community_sigma_total_; }
+  void set_community_sigma_total(edata_t community_sigma_total) {
     community_sigma_total_ = community_sigma_total;
   }
-  int64_t get_edge_weight() const { return edge_weight_; }
-  void set_edge_weight(int64_t edge_weight) { edge_weight_ = edge_weight; }
+  edata_t get_edge_weight() const { return edge_weight_; }
+  void set_edge_weight(edata_t edge_weight) { edge_weight_ = edge_weight; }
   comm_id_type get_source_id() const { return source_id_; }
   void set_source_id(const comm_id_type& source_id) { source_id_ = source_id; }
 
