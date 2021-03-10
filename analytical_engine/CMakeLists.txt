@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 if ("${GRAPHSCOPE_VERSION}" STREQUAL "")
     set(GRAPHSCOPE_ANALYTICAL_MAJOR_VERSION 0)
     set(GRAPHSCOPE_ANALYTICAL_MINOR_VERSION 1)
@@ -51,6 +48,8 @@ include_directories(${PROJECT_SOURCE_DIR})
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 if (APPLE)
+    set(CMAKE_CXX_STANDARD 14)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CMAKE_MACOSX_RPATH ON)
 else ()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -Werror -Wl,-rpath,$ORIGIN -Wno-redundant-move -Wno-class-memaccess")

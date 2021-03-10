@@ -76,20 +76,6 @@ class LouvainPregel
       program_.Compute(null_messages, pregel_vertex, ctx.compute_context_);
     }
 
-    // ctx.compute_context_.apply_combine(combinator_);
-    // ctx.compute_context_.before_comm();
-
-    /*
-    auto outer_vertices = frag.OuterVertices();
-    for (auto v : outer_vertices) {
-      auto& msgs = (ctx.compute_context_.messages_out())[v];
-      assert(msgs.size() <= 1);  // already combine
-      if (!msgs.empty()) {
-        messages.SyncStateOnOuterVertex<fragment_t, md_t>(frag, v, msgs[0]);
-        msgs.clear();
-      }
-    }
-    */
     {
       // Sync Aggregator
       for (auto& pair : ctx.compute_context_.aggregators()) {

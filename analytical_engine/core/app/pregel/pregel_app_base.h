@@ -41,7 +41,8 @@ class PregelAppBase
           FRAG_T,
           PregelContext<FRAG_T, PregelComputeContext<
                                     FRAG_T, typename VERTEX_PROGRAM_T::vd_t,
-                                    typename VERTEX_PROGRAM_T::md_t>>> {
+                                    typename VERTEX_PROGRAM_T::md_t>>>,
+      public grape::Communicator {
   using vd_t = typename VERTEX_PROGRAM_T::vd_t;
   using md_t = typename VERTEX_PROGRAM_T::md_t;
   using pregel_compute_context_t = PregelComputeContext<FRAG_T, vd_t, md_t>;
@@ -94,11 +95,24 @@ class PregelAppBase
       }
     }
 
-    if (ctx.compute_context_.has_messages()) {
-      messages.ForceContinue();
+    {
+      // Sync Aggregator
+      for (auto& pair : ctx.compute_context_.aggregators()) {
+        grape::InArchive iarc;
+        std::vector<grape::InArchive> oarcs;
+        std::string name = pair.first;
+        pair.second->Serialize(iarc);
+        pair.second->Reset();
+        AllGather(std::move(iarc), oarcs);
+        pair.second->DeserializeAndAggregate(oarcs);
+        pair.second->StartNewRound();
+      }
     }
 
     ctx.compute_context_.clear_for_next_round();
+    if (!ctx.compute_context_.all_halted()) {
+      messages.ForceContinue();
+    }
   }
 
   void IncEval(const fragment_t& frag, pregel_context_t& ctx,
@@ -144,11 +158,24 @@ class PregelAppBase
       }
     }
 
-    if (ctx.compute_context_.has_messages()) {
-      messages.ForceContinue();
+    {
+      // Sync Aggregator
+      for (auto& pair : ctx.compute_context_.aggregators()) {
+        grape::InArchive iarc;
+        std::vector<grape::InArchive> oarcs;
+        std::string name = pair.first;
+        pair.second->Serialize(iarc);
+        pair.second->Reset();
+        AllGather(std::move(iarc), oarcs);
+        pair.second->DeserializeAndAggregate(oarcs);
+        pair.second->StartNewRound();
+      }
     }
 
     ctx.compute_context_.clear_for_next_round();
+    if (!ctx.compute_context_.all_halted()) {
+      messages.ForceContinue();
+    }
   }
 
  private:
@@ -166,7 +193,8 @@ class PregelAppBase<FRAG_T, VERTEX_PROGRAM_T, void>
           FRAG_T,
           PregelContext<FRAG_T, PregelComputeContext<
                                     FRAG_T, typename VERTEX_PROGRAM_T::vd_t,
-                                    typename VERTEX_PROGRAM_T::md_t>>> {
+                                    typename VERTEX_PROGRAM_T::md_t>>>,
+          public grape::Communicator {
   using vd_t = typename VERTEX_PROGRAM_T::vd_t;
   using md_t = typename VERTEX_PROGRAM_T::md_t;
   using app_t = PregelAppBase<FRAG_T, VERTEX_PROGRAM_T>;
@@ -205,11 +233,25 @@ class PregelAppBase<FRAG_T, VERTEX_PROGRAM_T, void>
       program_.Compute(null_messages, pregel_vertex, ctx.compute_context_);
     }
 
-    if (ctx.compute_context_.has_messages()) {
-      messages.ForceContinue();
+    {
+      // Sync Aggregator
+      for (auto& pair : ctx.compute_context_.aggregators()) {
+        grape::InArchive iarc;
+        std::vector<grape::InArchive> oarcs;
+        std::string name = pair.first;
+        pair.second->Serialize(iarc);
+        pair.second->Reset();
+        AllGather(std::move(iarc), oarcs);
+        pair.second->DeserializeAndAggregate(oarcs);
+        pair.second->StartNewRound();
+      }
     }
 
     ctx.compute_context_.clear_for_next_round();
+
+    if (!ctx.compute_context_.all_halted()) {
+      messages.ForceContinue();
+    }
   }
 
   void IncEval(const fragment_t& frag, pregel_context_t& ctx,
@@ -242,11 +284,25 @@ class PregelAppBase<FRAG_T, VERTEX_PROGRAM_T, void>
       }
     }
 
-    if (ctx.compute_context_.has_messages()) {
-      messages.ForceContinue();
+    {
+      // Sync Aggregator
+      for (auto& pair : ctx.compute_context_.aggregators()) {
+        grape::InArchive iarc;
+        std::vector<grape::InArchive> oarcs;
+        std::string name = pair.first;
+        pair.second->Serialize(iarc);
+        pair.second->Reset();
+        AllGather(std::move(iarc), oarcs);
+        pair.second->DeserializeAndAggregate(oarcs);
+        pair.second->StartNewRound();
+      }
     }
 
     ctx.compute_context_.clear_for_next_round();
+
+    if (!ctx.compute_context_.all_halted()) {
+      messages.ForceContinue();
+    }
   }
 
  private:

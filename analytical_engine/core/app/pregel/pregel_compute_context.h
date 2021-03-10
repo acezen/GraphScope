@@ -64,7 +64,6 @@ class PregelComputeContext {
     step_ = 0;
     voted_to_halt_num_ = 0;
     enable_combine_ = false;
-    has_messages_ = false;
   }
 
   void inc_step() { step_++; }
@@ -94,7 +93,6 @@ class PregelComputeContext {
                                                                    v, value);
       } else {
         messages_out_[v].emplace_back(value);
-        has_messages_ = true;
       }
     }
   }
@@ -108,7 +106,6 @@ class PregelComputeContext {
                                                                    v, value);
       } else {
         messages_out_[v].emplace_back(std::move(value));
-        has_messages_ = true;
       }
     }
   }
@@ -133,7 +130,7 @@ class PregelComputeContext {
       messages_in_[v].clear();
       messages_in_[v].swap(messages_out_[v]);
       if (!messages_in_[v].empty()) {
-        has_messages_ = true;
+        activate(v);
       }
     }
   }
@@ -155,8 +152,6 @@ class PregelComputeContext {
   }
 
   bool all_halted() { return voted_to_halt_num_ == inner_vertex_num_; }
-
-  bool has_messages() { return has_messages_; }
 
   typename FRAG_T::template vertex_array_t<std::vector<MD_T>>& messages_in() {
     return messages_in_;
@@ -240,8 +235,6 @@ class PregelComputeContext {
 
   typename FRAG_T::template vertex_array_t<std::vector<MD_T>> messages_out_;
   typename FRAG_T::template vertex_array_t<std::vector<MD_T>> messages_in_;
-
-  bool has_messages_;
 
   size_t inner_vertex_num_;
   size_t total_vertex_num_;
