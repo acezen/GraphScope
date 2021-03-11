@@ -67,8 +67,8 @@ class LouvainContext
   }
 
   void SyncCommunity(grape::DefaultMessageManager& messages) {
-    vineyard::IdParser<vid_t> vid_parser;
     auto& frag = this->fragment();
+    auto& vid_parser = compute_context_.get_vid_parser();
     auto& comm_result = compute_context_.vertex_data();
     auto iv = frag.InnerVertices();
     for (auto v : iv) {
@@ -84,7 +84,7 @@ class LouvainContext
           } else {
             messages.SendToFragment(
               fid,
-              std::pair<vid_t, oid_t>(gid, list.front())
+              std::pair<vid_t, oid_t>(gid, community_id)
             );
           }
         }

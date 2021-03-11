@@ -26,6 +26,7 @@ limitations under the License.
 #include "core/app/pregel/aggregators/aggregator.h"
 #include "core/app/pregel/aggregators/aggregator_factory.h"
 #include "core/app/pregel/pregel_vertex.h"
+#include "core/config.h"
 
 namespace gs {
 /**
@@ -59,6 +60,7 @@ class PregelComputeContext {
 
     messages_in_.Init(inner_vertices, {});
     halted_.Init(inner_vertices, false);
+    vid_parser_.Init(frag.fnum(), 0);
     inner_vertex_num_ = inner_vertices.size();
 
     step_ = 0;
@@ -107,6 +109,28 @@ class PregelComputeContext {
       } else {
         messages_out_[v].emplace_back(std::move(value));
       }
+    }
+  }
+
+  void send_p2p_message(const vid_t& v_gid, const MD_T& value) {
+    auto fid = vid_parser_.GetFid(v_gid);
+    if (fragment_->fid() == fid) {
+      vertex_t v;
+      fragment_->Gid2Vertex(v_gid, v);
+      messages_out_[v].emplace_back(std::move(value));
+    } else {
+      message_manager_->SendToFragment(fid, value);
+    }
+  }
+
+  void send_p2p_message(const vid_t v_gid, MD_T&& value) {
+    auto fid = vid_parser_.GetFid(v_gid);
+    if (fragment_->fid() == fid) {
+      vertex_t v;
+      fragment_->Gid2Vertex(v_gid, v);
+      messages_out_[v].emplace_back(std::move(value));
+    } else {
+      message_manager_->SendToFragment(fid, value);
     }
   }
 
@@ -198,6 +222,10 @@ class PregelComputeContext {
     }
   }
 
+  const vineyard::IdParser<vid_t>& get_vid_parser() const {
+    return vid_parser_;
+  }
+
   std::unordered_map<std::string, std::shared_ptr<IAggregator>>& aggregators() {
     return aggregators_;
   }
@@ -244,6 +272,7 @@ class PregelComputeContext {
   int step_;
   std::unordered_map<std::string, std::string> config_;
   std::unordered_map<std::string, std::shared_ptr<IAggregator>> aggregators_;
+  vineyard::IdParser<vid_t> vid_parser_;
 };
 
 }  // namespace gs

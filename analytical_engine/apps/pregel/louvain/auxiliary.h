@@ -126,11 +126,12 @@ class LouvainMessage {
   using comm_id_type = VID_T;
   using edata_t = EDATA_T;
 
- private:
+ public:
   comm_id_type community_id_;
   edata_t community_sigma_total_;
   edata_t edge_weight_;
-  comm_id_type source_id_;
+  vid_t source_id_;
+  vid_t dst_id;
 
   // For reconstruct graph info.
   // Each vertex send self's meta info to its community and silence it self,
@@ -158,14 +159,16 @@ class LouvainMessage {
       : community_id_(0),
         community_sigma_total_(0),
         edge_weight_(0),
-        source_id_(0) {}
+        source_id_(0),
+        dst_id(0) {}
   LouvainMessage(const comm_id_type& community_id,
                  edata_t community_sigma_total, edata_t edge_weight,
-                 const comm_id_type& source_id)
+                 const comm_id_type& source_id, const vid_t& dst_id)
       : community_id_(community_id),
         community_sigma_total_(community_sigma_total),
         edge_weight_(edge_weight),
-        source_id_(source_id) {}
+        source_id_(source_id),
+        dst_id(dst_id) {}
 
   void add_to_sigma_total(edata_t partial) {
     community_sigma_total_ += partial;
@@ -190,6 +193,7 @@ class LouvainMessage {
     in_archive << u.community_sigma_total_;
     in_archive << u.edge_weight_;
     in_archive << u.source_id_;
+    in_archive << u.dst_id;
     in_archive << u.internal_weight_;
     in_archive << u.edges_;
     in_archive << u.nodes_in_self_community;
@@ -201,6 +205,7 @@ class LouvainMessage {
     out_archive >> val.community_sigma_total_;
     out_archive >> val.edge_weight_;
     out_archive >> val.source_id_;
+    out_archive >> val.dst_id;
     out_archive >> val.internal_weight_;
     out_archive >> val.edges_;
     out_archive >> val.nodes_in_self_community;

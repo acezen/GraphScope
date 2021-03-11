@@ -113,6 +113,7 @@ class PregelLouvain
     if (current_super_step == 0 && v.edge_size() == 0) {
       // nodes that have no edges send themselves a message on the step 0
       md_t message;
+      message.dst_id = v.gid();
       v.send_by_gid(v.gid(), message);
       v.vote_to_halt();
       return;
@@ -132,7 +133,6 @@ class PregelLouvain
         current_iteration % 2 == 0) {
       state.set_changed(0);  // change count is per pass
       int64_t total_change = context.template get_aggregated_value<int64_t>(CHANGE_AGG);
-      // LOG(INFO) << v.gid() << " get aggregate change " << total_change;
       state.add_change_history(total_change);
 
       // if halting aggregate q value and replace node edges with community edges
@@ -145,6 +145,7 @@ class PregelLouvain
         replaceNodeEdgesWithCommunityEdges(v, messages);
         aggregateQ(context, q);
         state.clear_change_history();
+        // v.vote_to_halt()
         return;
         // note: we did not vote to halt, MasterCompute will halt computation on
         // next step
@@ -158,7 +159,6 @@ class PregelLouvain
       // in the next step will require a progress check, aggregate the number of
       // nodes who have changed community.
       if (current_iteration > 0 && current_iteration % 2 == 0) {
-        // LOG(INFO) << v.gid() << " aggregate change " << vertex_value.get_changed();
         context.aggregate(CHANGE_AGG, state.get_changed());
       }
       break;
@@ -222,21 +222,25 @@ class PregelLouvain
       for (const auto& edge : vertex.fake_edges()) {
         md_t out_message(state.get_community(),
                          state.get_community_sigma_total(), edge.second,
-                         vertex.gid());
+                         vertex.gid(), edge.first);
         vertex.send_by_gid(edge.first, out_message);
       }
     } else {
       for (auto& edge : vertex.incoming_edges()) {
+        assert(vertex.fragment_->IsInnerVertex(edge.get_neighbor()));
+        auto nei_gid = vertex.fragment_->Vertex2Gid(edge.get_neighbor());
         md_t out_message(state.get_community(),
                          state.get_community_sigma_total(), edge.get_data(),
-                         vertex.gid());
-        vertex.send(edge.get_neighbor(), out_message);
+                         vertex.gid(), nei_gid);
+        vertex.send_by_gid(nei_gid, out_message);
       }
       for (auto& edge : vertex.outgoing_edges()) {
+        assert(vertex.fragment_->IsInnerVertex(edge.get_neighbor()));
+        auto nei_gid = vertex.fragment_->Vertex2Gid(edge.get_neighbor());
         md_t out_message(state.get_community(),
                          state.get_community_sigma_total(), edge.get_data(),
-                         vertex.gid());
-        vertex.send(edge.get_neighbor(), out_message);
+                         vertex.gid(), nei_gid);
+        vertex.send_by_gid(nei_gid, out_message);
       }
     }
   }
@@ -308,8 +312,7 @@ class PregelLouvain
     // send our node weight to the community hub to be summed in next super step
     md_t message(state.get_community(),
                  state.get_node_weight() + state.get_internal_weight(), 0,
-                 vertex.gid());
-    // LOG(INFO) << "Sending node weight to the community hub";
+                 vertex.gid(), state.get_community());
     vertex.send_by_gid(state.get_community(), message);
   }
 
@@ -370,6 +373,7 @@ class PregelLouvain
     }
 
     for (auto& m : messages) {
+      sum.dst_id = m.get_source_id();
       vertex.send_by_gid(m.get_source_id(), sum);
     }
   }
@@ -424,7 +428,7 @@ class PregelLouvain
     if (vertex.use_fake_edges()) {
       edges = vertex.fake_edges();
     } else {
-      LOG(ERROR) << "Not supposed to be here.";
+      //  LOG(ERROR) << "Not supposed to be here.";
       for (auto& edge : vertex.incoming_edges()) {
         edges[vertex.get_vertex_gid(edge.get_neighbor())] = edge.get_data();
       }
@@ -436,6 +440,7 @@ class PregelLouvain
     if (vertex.gid() != state.get_community()) {
       message.nodes_in_self_community.swap(vertex.nodes_in_self_community());
     }
+    message.dst_id = state.get_community();
     vertex.send_by_gid(state.get_community(), message);
 
     vertex.vote_to_halt();
@@ -466,6 +471,7 @@ class PregelLouvain
 
     // send self fake message to activate next round.
     md_t fake_message;
+    fake_message.dst_id = community_id;
     vertex.send_by_gid(community_id, fake_message);
     // do not vote to halt since next round those new vertex need to be active.
   }

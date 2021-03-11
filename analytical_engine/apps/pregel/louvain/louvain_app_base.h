@@ -127,15 +127,15 @@ class LouvainAppBase
           vertex_t v;
           vid_t v_vid = msg.first;
           oid_t comm_id = msg.second;
-          frag.Gid2Vertex(v_vid, v);
+          frag.InnerVertexGid2Vertex(v_vid, v);
           ctx.compute_context_.vertex_data()[v] = comm_id;
         }
       } else {
         // get message
-        vertex_t v(0);
         md_t msg;
-        while (messages.GetMessage<fragment_t, md_t>(frag, v, msg)) {
-          assert(frag.IsInnerVertex(v));
+        while (messages.GetMessage<md_t>(msg)) {
+          vertex_t v;
+          assert(frag.InnerVertexGid2Vertex(msg.dst_id, v));
           ctx.compute_context_.messages_in()[v].emplace_back(std::move(msg));
         }
       }
@@ -196,19 +196,19 @@ class LouvainAppBase
     }
 
     if (current_super_step != -9) {
-    for (auto v : inner_vertices) {
-      if (ctx.compute_context_.active(v)) {
-        pregel_vertex.set_vertex(v);
-        auto& cur_msgs = (ctx.compute_context_.messages_in())[v];
-        program_.Compute(
-            grape::IteratorPair<md_t*>(
-                &cur_msgs[0],
-                &cur_msgs[0] + static_cast<ptrdiff_t>(cur_msgs.size())),
-            pregel_vertex, ctx.compute_context_);
-      } else if (ctx.compute_context_.superstep() == -1) {
-        ctx.GetVertexState(v).set_alived_community(false);
+      for (auto v : inner_vertices) {
+        if (ctx.compute_context_.active(v)) {
+          pregel_vertex.set_vertex(v);
+          auto& cur_msgs = (ctx.compute_context_.messages_in())[v];
+          program_.Compute(
+              grape::IteratorPair<md_t*>(
+                  &cur_msgs[0],
+                  &cur_msgs[0] + static_cast<ptrdiff_t>(cur_msgs.size())),
+              pregel_vertex, ctx.compute_context_);
+        } else if (ctx.compute_context_.superstep() == -1) {
+          ctx.GetVertexState(v).set_alived_community(false);
+        }
       }
-    }
     }
 
     {
@@ -229,6 +229,7 @@ class LouvainAppBase
     if (!ctx.compute_context_.all_halted()) {
       messages.ForceContinue();
     } else if (current_super_step != -9) {
+      LOG(INFO) << "frag-" << frag.fid() << " ALL HALTED!";
       ctx.compute_context_.set_superstep(-10);
       // when all computation done, sync community from hub to all members.
       ctx.SyncCommunity(messages);

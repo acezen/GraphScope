@@ -94,14 +94,11 @@ class LouvainVertex : public PregelVertex<FRAG_T, VD_T, MD_T> {
   void send_by_id(const oid_t& dst_id, const md_t& md) {
     vertex_t v;
     fragment_->GetVertex(dst_id, v);
-    this->send(v, md);
+    send(v, md);
   }
 
   void send_by_gid(vid_t dst_gid, const md_t& md) {
-    vertex_t v;
-    // LOG(INFO) << "get gid: " << dst_gid;
-    fragment_->Gid2Vertex(dst_gid, v);
-    this->send(v, md);
+    compute_context_->send_p2p_message(dst_gid, md);
   }
 
   size_t edge_size() {
