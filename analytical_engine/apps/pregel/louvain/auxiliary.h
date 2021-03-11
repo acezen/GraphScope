@@ -115,11 +115,6 @@ class LouvainNodeState {
     fake_edges_ = edges;
   }
 
-  friend grape::InArchive& operator<<(grape::InArchive& in_archive,
-                                      const LouvainNodeState& u) {
-    in_archive << u.community_;
-  }
-
   std::vector<vid_t>& get_nodes_in_community() { return nodes_in_community_; }
 
   edata_t total_edge_weight = -1;

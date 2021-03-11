@@ -35,22 +35,23 @@ namespace gs {
 
 template <typename FRAG_T>
 class PregelLouvain
-    : public IPregelProgram<LouvainVertex<FRAG_T, LouvainNodeState<typename FRAG_T::vid_t, typename FRAG_T::edata_t>, LouvainMessage<typename FRAG_T::vid_t, typename FRAG_T::edata_t>>,
-                            PregelComputeContext<FRAG_T, LouvainNodeState<typename FRAG_T::vid_t, typename FRAG_T::edata_t>, LouvainMessage<typename FRAG_T::vid_t, typename FRAG_T::edata_t>>> {
+    : public IPregelProgram<LouvainVertex<FRAG_T, typename FRAG_T::oid_t, LouvainMessage<typename FRAG_T::vid_t, typename FRAG_T::edata_t>>,
+                            PregelComputeContext<FRAG_T, typename FRAG_T::oid_t, LouvainMessage<typename FRAG_T::vid_t, typename FRAG_T::edata_t>>> {
  public:
   using fragment_t = FRAG_T;
   using oid_t = typename fragment_t::oid_t;
   using vid_t = typename fragment_t::vid_t;
   using edata_t = typename fragment_t::edata_t;
-  using vd_t = LouvainNodeState<vid_t, edata_t>;
+  using vd_t = oid_t;
   using md_t = LouvainMessage<vid_t, edata_t>;
   using pregel_vertex_t = LouvainVertex<fragment_t, vd_t, md_t>;
   using compute_context_t = PregelComputeContext<fragment_t, vd_t, md_t>;
+  using state_t = LouvainNodeState<vid_t, edata_t>;
   using comm_id_type = vid_t;
 
  public:
   void Init(pregel_vertex_t& v, compute_context_t& context) override {
-    vd_t& vertex_value = v.ref_value();
+    state_t& state = v.ref_state();
     int64_t sigma_total = 0;
     for (auto& e : v.outgoing_edges()) {
         sigma_total += e.get_data();
@@ -59,12 +60,12 @@ class PregelLouvain
         sigma_total += e.get_data();
     }
 
-    vertex_value.set_community(v.gid());
-    vertex_value.set_community_sigma_total(sigma_total +
-                                           vertex_value.get_internal_weight());
-    vertex_value.set_node_weight(sigma_total);
-    vertex_value.set_from_louvain_vertex_reader(true);
-    v.nodes_in_self_community().push_back(vertex_value.get_community());
+    state.set_community(v.gid());
+    state.set_community_sigma_total(sigma_total +
+                                           state.get_internal_weight());
+    state.set_node_weight(sigma_total);
+    state.set_from_louvain_vertex_reader(true);
+    v.nodes_in_self_community().push_back(state.get_community());
 
     // register aggregators
     context.register_aggregator(CHANGE_AGG,
@@ -83,7 +84,7 @@ class PregelLouvain
     // the current iteration, two iterations make a full pass.
     int current_iteration = current_super_step / 3;
 
-    vd_t& vertex_value = v.ref_value();
+    state_t& state = v.ref_state();
 
     if (current_super_step == -2) {
       send_communities_info(v);
@@ -94,19 +95,19 @@ class PregelLouvain
     }
     // count the total edge weight of the graph on the first super step only
     if (current_super_step == 0) {
-      if (!vertex_value.is_from_louvain_vertex_reader()) {
+      if (!state.is_from_louvain_vertex_reader()) {
         // not from the disk but from the previous round's result
-        vertex_value.set_community(v.gid());
+        state.set_community(v.gid());
         int64_t edge_weight_aggregation = 0;
         // It must use fake edges since we already set them last round.
         for (auto& e : v.fake_edges()) {
           edge_weight_aggregation += e.second;
         }
-        vertex_value.set_node_weight(edge_weight_aggregation);
+        state.set_node_weight(edge_weight_aggregation);
       }
-      vertex_value.total_edge_weight = -1;
+      state.total_edge_weight = -1;
       context.aggregate(TOTAL_EDGE_WEIGHT_AGG,
-                        vertex_value.get_node_weight() + vertex_value.get_internal_weight());
+                        state.get_node_weight() + state.get_internal_weight());
     }
 
     if (current_super_step == 0 && v.edge_size() == 0) {
@@ -129,21 +130,21 @@ class PregelLouvain
     // made, if not halt
     if (current_minor_step == 1 && current_iteration > 0 &&
         current_iteration % 2 == 0) {
-      vertex_value.set_changed(0);  // change count is per pass
+      state.set_changed(0);  // change count is per pass
       int64_t total_change = context.template get_aggregated_value<int64_t>(CHANGE_AGG);
       // LOG(INFO) << v.gid() << " get aggregate change " << total_change;
-      vertex_value.add_change_history(total_change);
+      state.add_change_history(total_change);
 
       // if halting aggregate q value and replace node edges with community edges
       // (for next stage in pipeline)
-      if (decide_to_halt(vertex_value.get_change_history(),
+      if (decide_to_halt(state.get_change_history(),
                        std::stoi(context.get_config("tolerance")),
                        std::stoi(context.get_config("min_progress")))) {
         // stage 2
         double q = calculateActualQ(v, context, messages);
         replaceNodeEdgesWithCommunityEdges(v, messages);
         aggregateQ(context, q);
-        vertex_value.clear_change_history();
+        state.clear_change_history();
         return;
         // note: we did not vote to halt, MasterCompute will halt computation on
         // next step
@@ -158,7 +159,7 @@ class PregelLouvain
       // nodes who have changed community.
       if (current_iteration > 0 && current_iteration % 2 == 0) {
         // LOG(INFO) << v.gid() << " aggregate change " << vertex_value.get_changed();
-        context.aggregate(CHANGE_AGG, vertex_value.get_changed());
+        context.aggregate(CHANGE_AGG, state.get_changed());
       }
       break;
     case 1:
@@ -184,12 +185,12 @@ class PregelLouvain
   * @return 2*the total graph weight.
   */
   int64_t getTotalEdgeWeight(compute_context_t& context, pregel_vertex_t& v) {
-    auto& vertex_value = v.ref_value();
-    if (vertex_value.total_edge_weight == -1) {
+    auto& state = v.ref_state();
+    if (state.total_edge_weight == -1) {
       int64_t total_edge_weight = context.template get_aggregated_value<int64_t>(TOTAL_EDGE_WEIGHT_AGG);
-      vertex_value.total_edge_weight = total_edge_weight;
+      state.total_edge_weight = total_edge_weight;
     }
-    return vertex_value.total_edge_weight;
+    return state.total_edge_weight;
   }
 
   /**
@@ -200,7 +201,7 @@ class PregelLouvain
   */
   void getAndSendCommunityInfo(pregel_vertex_t& vertex, compute_context_t& context,
                                const grape::IteratorPair<md_t*>& messages) {
-    vd_t& state = vertex.ref_value();
+    state_t& state = vertex.ref_state();
     // set new community information.
     if (context.superstep() > 0) {
       if (messages.empty()) {
@@ -267,7 +268,7 @@ class PregelLouvain
       }
     }
 
-    auto& state = vertex.ref_value();
+    auto& state = vertex.ref_state();
     // calculate change in Q for each potential community
     comm_id_type best_community_id = state.get_community();
     comm_id_type starting_community_id = best_community_id;
@@ -378,7 +379,7 @@ class PregelLouvain
    */
   double calculateActualQ(pregel_vertex_t& vertex, compute_context_t& context,
                           const grape::IteratorPair<md_t*>& messages) {
-    auto state = vertex.value();
+    auto& state = vertex.ref_state();
     int64_t k_i_in = state.get_internal_weight();
     for (auto& m : messages) {
       if (m.get_community_id() == state.get_community()) {
@@ -416,9 +417,9 @@ class PregelLouvain
   }
 
   void send_communities_info(pregel_vertex_t& vertex) {
-    vd_t& vertex_value = vertex.ref_value();
+    state_t& state = vertex.ref_state();
     md_t message;
-    message.set_internal_weight(vertex_value.get_internal_weight());
+    message.set_internal_weight(state.get_internal_weight());
     std::map<comm_id_type, edata_t> edges;
     if (vertex.use_fake_edges()) {
       edges = vertex.fake_edges();
@@ -432,10 +433,10 @@ class PregelLouvain
       }
     }
     message.set_edges(std::move(edges));
-    if (vertex.gid() != vertex_value.get_community()) {
+    if (vertex.gid() != state.get_community()) {
       message.nodes_in_self_community.swap(vertex.nodes_in_self_community());
     }
-    vertex.send_by_gid(vertex_value.get_community(), message);
+    vertex.send_by_gid(state.get_community(), message);
 
     vertex.vote_to_halt();
   }
@@ -459,9 +460,9 @@ class PregelLouvain
                                      m.nodes_in_self_community.begin(),
                                      m.nodes_in_self_community.end());
     }
-    vertex.ref_value().set_internal_weight(weight);
+    vertex.ref_state().set_internal_weight(weight);
     vertex.set_fake_edges(std::move(edge_map));
-    vertex.ref_value().set_from_louvain_vertex_reader(false);
+    vertex.ref_state().set_from_louvain_vertex_reader(false);
 
     // send self fake message to activate next round.
     md_t fake_message;

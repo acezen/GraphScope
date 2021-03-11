@@ -56,6 +56,7 @@ class LouvainAppBase
   INSTALL_DEFAULT_WORKER(app_t, pregel_context_t, FRAG_T)
 
  public:
+  using oid_t = typename fragment_t::oid_t;
   using vid_t = typename fragment_t::vid_t;
   using vertex_t = typename fragment_t::vertex_t;
 
@@ -68,6 +69,7 @@ class LouvainAppBase
     LouvainVertex<fragment_t, vd_t, md_t> pregel_vertex;
     pregel_vertex.set_fragment(&frag);
     pregel_vertex.set_compute_context(&ctx.compute_context_);
+    pregel_vertex.set_context(&ctx);
 
     grape::IteratorPair<md_t*> null_messages(nullptr, nullptr);
     auto inner_vertices = frag.InnerVertices();
@@ -120,13 +122,13 @@ class LouvainAppBase
 
     {
       if (current_super_step == -9) {
-        std::pair<vid_t, vid_t> msg;
-        while (messages.GetMessage<std::pair<vid_t, vid_t>>(msg)) {
+        std::pair<vid_t, oid_t> msg;
+        while (messages.GetMessage<std::pair<vid_t, oid_t>>(msg)) {
           vertex_t v;
           vid_t v_vid = msg.first;
-          vid_t comm_id = msg.second;
+          oid_t comm_id = msg.second;
           frag.Gid2Vertex(v_vid, v);
-          ctx.compute_context_.vertex_data()[v].set_community(comm_id);
+          ctx.compute_context_.vertex_data()[v] = comm_id;
         }
       } else {
         // get message
@@ -142,6 +144,7 @@ class LouvainAppBase
     LouvainVertex<fragment_t, vd_t, md_t> pregel_vertex;
     pregel_vertex.set_fragment(&frag);
     pregel_vertex.set_compute_context(&ctx.compute_context_);
+    pregel_vertex.set_context(&ctx);
 
     if (current_minor_step == 1 && current_iteration > 0 &&
         current_iteration % 2 == 0) {
@@ -185,7 +188,7 @@ class LouvainAppBase
     if (ctx.compute_context_.superstep() == -2) {
       for (auto& v : inner_vertices) {
         bool is_alived_community =
-            ctx.compute_context_.vertex_data()[v].is_alived_community();
+            ctx.GetVertexState(v).is_alived_community();
         if (is_alived_community) {
           ctx.compute_context_.activate(v);
         }
@@ -203,7 +206,7 @@ class LouvainAppBase
                 &cur_msgs[0] + static_cast<ptrdiff_t>(cur_msgs.size())),
             pregel_vertex, ctx.compute_context_);
       } else if (ctx.compute_context_.superstep() == -1) {
-        ctx.compute_context_.vertex_data()[v].set_alived_community(false);
+        ctx.GetVertexState(v).set_alived_community(false);
       }
     }
     }

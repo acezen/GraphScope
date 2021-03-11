@@ -34,6 +34,9 @@ class LouvainVertex : public PregelVertex<FRAG_T, VD_T, MD_T> {
   using oid_t = typename fragment_t::oid_t;
   using vid_t = typename fragment_t::vid_t;
   using edata_t = typename fragment_t::edata_t;
+  using compute_context_t = PregelComputeContext<fragment_t, VD_T, MD_T>;
+  using context_t = LouvainContext<FRAG_T, compute_context_t>;
+  using state_t = LouvainNodeState<vid_t, edata_t>;
 
  public:
   using vd_t = VD_T;
@@ -68,14 +71,18 @@ class LouvainVertex : public PregelVertex<FRAG_T, VD_T, MD_T> {
 
   void set_fragment(const fragment_t* fragment) { fragment_ = fragment; }
 
-  void set_compute_context(
-      PregelComputeContext<fragment_t, VD_T, MD_T>* compute_comtext) {
-    compute_context_ = compute_comtext;
+  void set_compute_context(compute_context_t* compute_context) {
+    compute_context_ = compute_context;
+  }
+
+  void set_context(context_t* context) {
+    context_ = context;
   }
 
   void set_vertex(vertex_t vertex) { vertex_ = vertex; }
-  VD_T& ref_value() {
-    return compute_context_->vertex_data()[vertex_];
+
+  state_t& ref_state() {
+    return context_->GetVertexState(vertex_);
   }
 
   vid_t gid() {
@@ -106,11 +113,11 @@ class LouvainVertex : public PregelVertex<FRAG_T, VD_T, MD_T> {
   }
 
   bool use_fake_edges() {
-    return compute_context_->vertex_data()[vertex_].use_fake_edges();
+    return context_->GetVertexState(vertex_).use_fake_edges();
   }
 
   const std::map<vid_t, edata_t>& fake_edges() const {
-    return compute_context_->vertex_data()[vertex_].get_fake_edges();
+    return context_->GetVertexState(vertex_).get_fake_edges();
   }
 
   // TODO: const reference
@@ -133,17 +140,19 @@ class LouvainVertex : public PregelVertex<FRAG_T, VD_T, MD_T> {
   }
 
   void set_fake_edges(std::map<vid_t, edata_t>&& edges) {
-    compute_context_->vertex_data()[vertex_].set_fake_edges(edges);
-    compute_context_->vertex_data()[vertex_].set_use_fake_edges(true);
+    state_t& ref_state = this->ref_state();
+    ref_state.set_fake_edges(edges);
+    ref_state.set_use_fake_edges(true);
   }
 
   std::vector<vid_t>& nodes_in_self_community() {
-    return compute_context_->vertex_data()[vertex_].get_nodes_in_community();
+    return context_->GetVertexState(vertex_).get_nodes_in_community();
   }
 
  public:
   const fragment_t* fragment_;
   PregelComputeContext<fragment_t, VD_T, MD_T>* compute_context_;
+  context_t* context_;
 
   vertex_t vertex_;
 
