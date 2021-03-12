@@ -506,8 +506,10 @@ bl::result<std::string> GrapeInstance::contextToVineyardDataFrame(
   auto s_id = vineyard::ObjectIDToString(id);
 
   client_->PutName(id, s_id);
+  vineyard::ObjectMeta meta;
+  client_->GetMetaData(id, meta);
 
-  return toJson({{"object_id", s_id}});
+  return toJson({{"object_id", s_id}, {"meta", meta.MetaData().dump()}});
 }
 
 bl::result<rpc::GraphDef> GrapeInstance::addColumn(

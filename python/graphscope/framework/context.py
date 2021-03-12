@@ -172,6 +172,10 @@ class BaseContext(object):
         return object_id
 
     def to_vineyard_dataframe(self, selector=None, vertex_range=None):
+        object_id, meta = self.to_vineyard_dataframe_extra(selector, vertex_range)
+        return object_id
+
+    def to_vineyard_dataframe_extra(self, selector=None, vertex_range=None):
         """Return results as a vineyard dataframe.
         Only object id is returned.
 
@@ -202,8 +206,10 @@ class BaseContext(object):
         vertex_range = utils.transform_vertex_range(vertex_range)
         op = dag_utils.to_vineyard_dataframe(self, selector, vertex_range)
         ret = op.eval()
-        object_id = json.loads(ret)["object_id"]
-        return object_id
+        ret = json.loads(ret)
+        object_id = ret["object_id"]
+        meta = json.loads(ret["meta"])
+        return object_id, meta
 
     def output(self, fd, selector, vertex_range=None, **kwargs):
         """Dump results to `fd`.
