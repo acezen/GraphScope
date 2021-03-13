@@ -20,12 +20,11 @@ template <typename FRAG_T, typename COMPUTE_CONTEXT_T>
 class LouvainContext
     : public grape::VertexDataContext<FRAG_T,
                                       typename COMPUTE_CONTEXT_T::vd_t> {
+  using fragment_t = FRAG_T;
   using oid_t = typename FRAG_T::oid_t;
   using vid_t = typename FRAG_T::vid_t;
   using edata_t = typename FRAG_T::edata_t;
   using vertex_t = typename FRAG_T::vertex_t;
-  using vd_t = typename COMPUTE_CONTEXT_T::vd_t;
-  using fragment_t = FRAG_T;
   using state_t = LouvainNodeState<vid_t, edata_t>;
   using vertex_state_array_t = typename fragment_t::template vertex_array_t<state_t>;
 
@@ -59,10 +58,17 @@ class LouvainContext
 
   void Output(std::ostream& os) override {
     auto& frag = this->fragment();
-    auto& result = compute_context_.vertex_data();
+    // auto& result = compute_context_.vertex_data();
     auto iv = frag.InnerVertices();
     for (auto v : iv) {
-      os << frag.GetId(v) << " " << result[v] << std::endl;
+      auto& list = vertex_state_[v].nodes_in_community;
+      // os << frag.GetId(v) << " " << result[v] << std::endl;
+      if (!list.empty()) {
+        auto community_id = frag.Gid2Oid(list.front());
+        for (auto& gid : list) {
+          os << frag.Gid2Oid(gid) << " " << community_id << std::endl;
+        }
+      }
     }
   }
 
@@ -72,7 +78,7 @@ class LouvainContext
     auto& comm_result = compute_context_.vertex_data();
     auto iv = frag.InnerVertices();
     for (auto v : iv) {
-      auto& list = vertex_state_[v].get_nodes_in_community();
+      auto& list = vertex_state_[v].nodes_in_community;
       if (!list.empty()) {
         auto community_id = frag.Gid2Oid(list.front());
         for (auto& gid : list) {
