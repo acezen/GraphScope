@@ -31,6 +31,7 @@
 #include "apps/pregel/pagerank_pregel.h"
 #include "apps/pregel/sssp_pregel.h"
 #include "apps/pregel/tc_pregel.h"
+#include "apps/pregel/louvain/louvain_app_base.h"
 #include "core/app/pregel/pregel_app_base.h"
 #include "core/loader/arrow_fragment_loader.h"
 
