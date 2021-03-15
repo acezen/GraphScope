@@ -146,10 +146,6 @@ int main(int argc, char** argv) {
     if (app_name == "tc") {
       std::string efile = argv[2], vfile = argv[3], output_prefix = argv[4];
       RunTC(comm_spec, efile, vfile, "", output_prefix);
-    } else if (app_name == "louvain") {
-      std::string efile = argv[2], vfile = argv[3], output_prefix = argv[4], tol = argv[5], min=argv[6];
-      std::string query = "{\"tolerance\": " + tol + ", \"min_progress\": " + min + "}";
-      RunLouvain(comm_spec, efile, vfile, query, output_prefix);
     } else {
       int index = 1;
       std::string ipc_socket = std::string(argv[index++]);

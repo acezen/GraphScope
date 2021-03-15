@@ -121,16 +121,27 @@ class LouvainAppBase
               << " current iteration: " << current_iteration;
 
     {
-      // get message
-      md_t msg;
-      while (messages.GetMessage<md_t>(msg)) {
-        vertex_t v;
-        if(!frag.InnerVertexGid2Vertex(msg.dst_id, v)) {
-          LOG(FATAL) << "v-" << msg.dst_id << " is not inner vertex of frag-"
-                     << frag.fid();
+      if (current_super_step == -9) {
+        std::pair<vid_t, oid_t> msg;
+        while (messages.GetMessage<std::pair<vid_t, oid_t>>(msg)) {
+          vertex_t v;
+          vid_t v_vid = msg.first;
+          oid_t comm_id = msg.second;
+          frag.InnerVertexGid2Vertex(v_vid, v);
+          ctx.compute_context_.vertex_data()[v] = comm_id;
         }
-        ctx.compute_context_.messages_in()[v].emplace_back(std::move(msg));
-        ctx.compute_context_.activate(v);
+      } else {
+        // get message
+        md_t msg;
+        while (messages.GetMessage<md_t>(msg)) {
+          vertex_t v;
+          if(!frag.InnerVertexGid2Vertex(msg.dst_id, v)) {
+            LOG(FATAL) << "v-" << msg.dst_id << " is not inner vertex of frag-"
+                      << frag.fid();
+          }
+          ctx.compute_context_.messages_in()[v].emplace_back(std::move(msg));
+          ctx.compute_context_.activate(v);
+        }
       }
     }
 
@@ -147,15 +158,15 @@ class LouvainAppBase
       ctx.change_history.push_back(totalChange);
       ctx.halt = decide_to_halt(
           ctx.change_history,
-          std::stoi(ctx.compute_context_.get_config("tolerance")),
-          std::stoi(ctx.compute_context_.get_config("min_progress")));
+          ctx.tolerance,
+          ctx.min_progress);
       if (ctx.halt) {
         LOG(INFO) << "super step " << current_super_step << " decided to halt.";
       }
       LOG(INFO) << "[INFO]: superstep: " << current_super_step
                 << " pass: " << current_iteration / 2
                 << " totalChange: " << totalChange;
-    } else if (ctx.halt) {
+    } else if (ctx.halt && current_super_step > -9) {
       double actualQ =
           ctx.compute_context_.template get_aggregated_value<double>(
               ACTUAL_Q_AGG);
@@ -163,7 +174,11 @@ class LouvainAppBase
       // changes, so we halt stage 2.
       if (current_super_step <= 14 || actualQ <= ctx.previous_q) {
         // stage 2 halt, the whole computaion terminated.
-        LOG(INFO) << "stage 2 halt, ACTUAL Q: " << actualQ;
+        if (actualQ < ctx.previous_q) {
+          LOG(INFO) << "stage 2 halt, Final Q: " << ctx.previous_q;
+        } else {
+          LOG(INFO) << "stage 2 halt, Final Q: " << actualQ;
+        }
       } else if (ctx.compute_context_.superstep() > 0) {
         // stage 1 halt
         LOG(INFO) << "super step: " << current_super_step
@@ -187,6 +202,7 @@ class LouvainAppBase
     }
 
 
+    if (current_super_step > -9) {
     for (auto v : inner_vertices) {
       if (ctx.compute_context_.active(v)) {
         pregel_vertex.set_vertex(v);
@@ -199,6 +215,7 @@ class LouvainAppBase
       } else if (ctx.compute_context_.superstep() == -1) {
         ctx.GetVertexState(v).is_alived_community = false;
       }
+    }
     }
 
     {
@@ -218,6 +235,9 @@ class LouvainAppBase
     ctx.compute_context_.clear_for_next_round();
     if (!ctx.compute_context_.all_halted()) {
       messages.ForceContinue();
+    } else if (current_super_step != -9) {
+      ctx.compute_context_.set_superstep(-10);
+      ctx.SyncCommunity(messages);
     }
   }
 

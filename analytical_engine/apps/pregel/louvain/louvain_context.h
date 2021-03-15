@@ -34,7 +34,7 @@ class LouvainContext
             fragment),
         compute_context_(this->data()) {}
 
-  void Init(grape::DefaultMessageManager& messages, const std::string& args) {
+  void Init(grape::DefaultMessageManager& messages, int tol, int min_p) {
     auto& frag = this->fragment();
     auto inner_vertices = frag.InnerVertices();
 
@@ -42,17 +42,8 @@ class LouvainContext
     compute_context_.set_fragment(&frag);
     compute_context_.set_message_manager(&messages);
 
-    if (!args.empty()) {
-      // The app params are passed via serialized json string.
-      boost::property_tree::ptree pt;
-      std::stringstream ss;
-      ss << args;
-      boost::property_tree::read_json(ss, pt);
-      for (const auto& x : pt) {
-        compute_context_.set_config(x.first, x.second.get_value<std::string>());
-      }
-    }
-
+    tolerance = tol;
+    min_progress = min_p;
     vertex_state_.Init(inner_vertices);
   }
 
@@ -106,6 +97,8 @@ class LouvainContext
   bool halt = false;  // stage 1
   COMPUTE_CONTEXT_T compute_context_;
   double previous_q = 0.0;
+  int tolerancce;
+  int min_progress;
 
   vertex_state_array_t vertex_state_;
 };
