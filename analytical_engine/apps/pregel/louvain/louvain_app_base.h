@@ -116,7 +116,7 @@ class LouvainAppBase
     int current_minor_step = current_super_step % 3;
     int current_iteration = current_super_step / 3;
 
-    LOG(INFO) << "current super step: " << current_super_step
+    VLOG(2) << "current super step: " << current_super_step
               << " current minor step: " << current_minor_step
               << " current iteration: " << current_iteration;
 
@@ -161,9 +161,9 @@ class LouvainAppBase
           ctx.tolerance,
           ctx.min_progress);
       if (ctx.halt) {
-        LOG(INFO) << "super step " << current_super_step << " decided to halt.";
+        VLOG(2) << "super step " << current_super_step << " decided to halt.";
       }
-      LOG(INFO) << "[INFO]: superstep: " << current_super_step
+      VLOG(2) << "[INFO]: superstep: " << current_super_step
                 << " pass: " << current_iteration / 2
                 << " totalChange: " << totalChange;
     } else if (ctx.halt && current_super_step > -9) {
@@ -181,7 +181,7 @@ class LouvainAppBase
         }
       } else if (ctx.compute_context_.superstep() > 0) {
         // stage 1 halt
-        LOG(INFO) << "super step: " << current_super_step
+        VLOG(2) << "super step: " << current_super_step
                   << " decided to halt, ACTUAL Q: " << actualQ
                   << " previous Q: " << ctx.previous_q;
         ctx.compute_context_.set_superstep(-2);

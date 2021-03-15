@@ -97,7 +97,7 @@ class LouvainContext
   bool halt = false;  // stage 1
   COMPUTE_CONTEXT_T compute_context_;
   double previous_q = 0.0;
-  int tolerancce;
+  int tolerance;
   int min_progress;
 
   vertex_state_array_t vertex_state_;

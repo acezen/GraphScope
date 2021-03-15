@@ -49,7 +49,7 @@ void traverse_fragment(std::shared_ptr<gs::ArrowProjectedFragment<
   for (auto v : inner_vertices) {
     auto id = fragment->GetId(v);
     std::string data = std::string(fragment->GetData(v));
-    fprintf(vfile, "%lld|%s\n", id, data.c_str());
+    fprintf(vfile, "%ld|%s\n", id, data.c_str());
   }
   fflush(vfile);
   fclose(vfile);
@@ -62,7 +62,7 @@ void traverse_fragment(std::shared_ptr<gs::ArrowProjectedFragment<
     for (auto& e : oe) {
       auto u = e.neighbor();
       auto val = std::string(e.data());
-      fprintf(oefile, "%lld|%lld|%s\n", fragment->GetId(v), fragment->GetId(u),
+      fprintf(oefile, "%ld|%ld|%s\n", fragment->GetId(v), fragment->GetId(u),
               val.c_str());
     }
   }
@@ -77,7 +77,7 @@ void traverse_fragment(std::shared_ptr<gs::ArrowProjectedFragment<
     for (auto& e : ie) {
       auto u = e.neighbor();
       auto val = std::string(e.data());
-      fprintf(iefile, "%lld|%lld|%s\n", fragment->GetId(u), fragment->GetId(v),
+      fprintf(iefile, "%ld|%ld|%s\n", fragment->GetId(u), fragment->GetId(v),
               val.c_str());
     }
   }

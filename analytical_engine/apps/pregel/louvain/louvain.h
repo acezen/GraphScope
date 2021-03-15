@@ -177,7 +177,7 @@ class PregelLouvain
       break;
     default:
       // FIXME: raise error
-      LOG(INFO) << "Invalid minor step: " << current_minor_step;
+      LOG(FATAL) << "Invalid minor step: " << current_minor_step;
     }
     v.vote_to_halt();
   }
