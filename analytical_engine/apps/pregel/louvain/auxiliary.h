@@ -30,6 +30,7 @@ namespace gs {
 #define CHANGE_AGG "change_aggregator"
 #define TOTAL_EDGE_WEIGHT_AGG "total_edge_weight_aggregator"
 #define ACTUAL_Q_AGG "actual_q_aggregator"
+#define ALL_HALTED "all_halted"
 
 template <typename VID_T, typename EDATA_T>
 struct LouvainNodeState {

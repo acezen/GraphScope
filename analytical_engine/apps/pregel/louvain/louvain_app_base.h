@@ -70,6 +70,8 @@ class LouvainAppBase
     pregel_vertex.set_context(&ctx);
     pregel_vertex.set_fragment(&frag);
     pregel_vertex.set_compute_context(&ctx.compute_context_);
+    context.register_aggregator(ALL_HALTED,
+                                PregelAggregatorType::kBoolAndAggregator);
 
     grape::IteratorPair<md_t*> null_messages(nullptr, nullptr);
     auto inner_vertices = frag.InnerVertices();
@@ -116,10 +118,16 @@ class LouvainAppBase
     int current_minor_step = current_super_step % 3;
     int current_iteration = current_super_step / 3;
 
-    VLOG(2) << "current super step: " << current_super_step
+    LOG(INFO) << "current super step: " << current_super_step
               << " current minor step: " << current_minor_step
               << " current iteration: " << current_iteration;
 
+    if (ctx.template get_aggregated_value<bool>(ALL_HALTED)) {
+      LOG(INFO) << "all workers halted.";
+      ctx.compute_context_.set_superstep(-10);
+      ctx.SyncCommunity(messages);
+      return;
+    }
     {
       if (current_super_step == -9) {
         std::pair<vid_t, oid_t> msg;
@@ -130,6 +138,7 @@ class LouvainAppBase
           frag.InnerVertexGid2Vertex(v_vid, v);
           ctx.compute_context_.vertex_data()[v] = comm_id;
         }
+        return;
       } else {
         // get message
         md_t msg;
@@ -234,10 +243,11 @@ class LouvainAppBase
 
     ctx.compute_context_.clear_for_next_round();
     if (!ctx.compute_context_.all_halted()) {
+      ctx.aggregate(ALL_HALTED, false);
       messages.ForceContinue();
     } else if (current_super_step != -9) {
-      ctx.compute_context_.set_superstep(-10);
-      ctx.SyncCommunity(messages);
+      ctx.aggregate(ALL_HALTED, true);
+      LOG(INFO) << "frag-" << frag.fid() << " halted.";
     }
   }
 
