@@ -70,7 +70,7 @@ class LouvainAppBase
     pregel_vertex.set_context(&ctx);
     pregel_vertex.set_fragment(&frag);
     pregel_vertex.set_compute_context(&ctx.compute_context_);
-    context.register_aggregator(ALL_HALTED,
+    ctx.compute_context_.register_aggregator(ALL_HALTED,
                                 PregelAggregatorType::kBoolAndAggregator);
 
     grape::IteratorPair<md_t*> null_messages(nullptr, nullptr);
@@ -85,6 +85,8 @@ class LouvainAppBase
       pregel_vertex.set_vertex(v);
       program_.Compute(null_messages, pregel_vertex, ctx.compute_context_);
     }
+
+    ctx.compute_context_.aggregate(ALL_HALTED, false);
 
     {
       // Sync Aggregator
@@ -122,10 +124,15 @@ class LouvainAppBase
               << " current minor step: " << current_minor_step
               << " current iteration: " << current_iteration;
 
-    if (ctx.template get_aggregated_value<bool>(ALL_HALTED)) {
+    bool all_halted = ctx.compute_context_.template get_aggregated_value<bool>(ALL_HALTED);
+    if (all_halted) {
       LOG(INFO) << "all workers halted.";
       ctx.compute_context_.set_superstep(-10);
       ctx.SyncCommunity(messages);
+      // int64_t halted = 0;
+      // ctx.compute_context_.aggregate(ALL_HALTED, halted);
+      ctx.compute_context_.aggregate(ALL_HALTED, false);
+      ctx.compute_context_.aggregators()[ALL_HALTED]->StartNewRound();
       return;
     }
     {
@@ -227,6 +234,15 @@ class LouvainAppBase
     }
     }
 
+    ctx.compute_context_.clear_for_next_round();
+    if (!ctx.compute_context_.all_halted()) {
+      ctx.compute_context_.aggregate(ALL_HALTED, false);
+      messages.ForceContinue();
+    } else if (current_super_step != -9 && messages.GetMsgSize() == 0) {
+      ctx.compute_context_.aggregate(ALL_HALTED, true);
+      messages.ForceContinue();
+      LOG(INFO) << "frag-" << frag.fid() << " halted.";
+    }
     {
       // Sync Aggregator
       for (auto& pair : ctx.compute_context_.aggregators()) {
@@ -239,15 +255,6 @@ class LouvainAppBase
         pair.second->DeserializeAndAggregate(oarcs);
         pair.second->StartNewRound();
       }
-    }
-
-    ctx.compute_context_.clear_for_next_round();
-    if (!ctx.compute_context_.all_halted()) {
-      ctx.aggregate(ALL_HALTED, false);
-      messages.ForceContinue();
-    } else if (current_super_step != -9) {
-      ctx.aggregate(ALL_HALTED, true);
-      LOG(INFO) << "frag-" << frag.fid() << " halted.";
     }
   }
 
