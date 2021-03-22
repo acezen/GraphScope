@@ -156,6 +156,8 @@ class LouvainAppBase
               << " current minor step: " << current_minor_step
               << " current iteration: " << current_iteration;
 
+    double begin grape::GetCurrentTime();
+
     if (current_super_step == terminate_step) {
       // get result messages and terminate
       messages.ParallelProcess<std::pair<vid_t, oid_t>>(
@@ -196,7 +198,8 @@ class LouvainAppBase
       }
     }
 
-    LOG(INFO) << "finish process msgs.";
+    LOG(INFO) << "finish process msgs. time=" << grape::GetCurrrentTime() - begin;
+    begin = grape::GetCurrentTime();
 
     if (current_minor_step == phase_one_minor_step_1 && current_iteration > 0 &&
         current_iteration % 2 == 0) {
@@ -291,7 +294,7 @@ class LouvainAppBase
 
     ctx.compute_context().clear_for_next_round();
 
-    LOG(INFO) << "finish computation and check all halted.";
+    LOG(INFO) << "finish computation and check all halted.time=" << grape::GetCurrrentTime() - begin;;
     if (!ctx.compute_context().all_halted()) {
       messages.ForceContinue();
     }
