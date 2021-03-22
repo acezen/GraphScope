@@ -196,6 +196,8 @@ class LouvainAppBase
       }
     }
 
+    LOG(INFO) << "finish process msgs.";
+
     if (current_minor_step == phase_one_minor_step_1 && current_iteration > 0 &&
         current_iteration % 2 == 0) {
       int64_t totalChange =
@@ -288,6 +290,8 @@ class LouvainAppBase
     }
 
     ctx.compute_context().clear_for_next_round();
+
+    LOG(INFO) << "finish computation and check all halted.";
     if (!ctx.compute_context().all_halted()) {
       messages.ForceContinue();
     }
