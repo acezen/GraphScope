@@ -77,6 +77,7 @@ class LouvainAppBase
              message_manager_t& messages) {
     // superstep is 0 in PEval
     uint32_t thrd_num = thread_num();
+    LOG(INFO) << "thread num=" << thrd_num;
     messages.InitChannels(thrd_num);
 
     // register the aggregators
@@ -90,7 +91,7 @@ class LouvainAppBase
 
     auto inner_vertices = frag.InnerVertices();
     ForEach(inner_vertices, [&frag, &ctx, this](int tid, vertex_t v) {
-      LouvainVertex<fragment_t, vd_t, md_t> pregel_vertex;
+      thread_local LouvainVertex<fragment_t, vd_t, md_t> pregel_vertex;
       pregel_vertex.set_context(&ctx);
       pregel_vertex.set_fragment(&frag);
       pregel_vertex.set_compute_context(&ctx.compute_context());
@@ -102,7 +103,7 @@ class LouvainAppBase
     grape::IteratorPair<md_t*> null_messages(nullptr, nullptr);
     ForEach(inner_vertices,
             [&null_messages, &frag, &ctx, this](int tid, vertex_t v) {
-              LouvainVertex<fragment_t, vd_t, md_t> pregel_vertex;
+              thread_local LouvainVertex<fragment_t, vd_t, md_t> pregel_vertex;
               pregel_vertex.set_context(&ctx);
               pregel_vertex.set_fragment(&frag);
               pregel_vertex.set_compute_context(&ctx.compute_context());
@@ -149,14 +150,16 @@ class LouvainAppBase
     auto outer_vertices = frag.OuterVertices();
 
     int current_super_step = ctx.compute_context().superstep();
+    // the minor step in phase 1
     int current_minor_step = current_super_step % 3;
+    // the current iteration, two iterations make a full pass.
     int current_iteration = current_super_step / 3;
 
     LOG(INFO) << "current super step: " << current_super_step
               << " current minor step: " << current_minor_step
               << " current iteration: " << current_iteration;
 
-    double begin grape::GetCurrentTime();
+    double begin = grape::GetCurrentTime();
 
     if (current_super_step == terminate_step) {
       // get result messages and terminate
@@ -169,18 +172,22 @@ class LouvainAppBase
       return;  // the whole louvain terminate.
     } else {
       // get computation messages
+      double t1 = grape::GetCurrentTime();
+      uint32_t thrd_num_msg = thrd_num / 2;
       std::vector<std::vector<std::vector<md_t>>> buffer(
-          thrd_num, std::vector<std::vector<md_t>>(thrd_num));
+          thrd_num_msg, std::vector<std::vector<md_t>>(thrd_num_msg));
       messages.ParallelProcess<md_t>(
-          thrd_num, [&thrd_num, &buffer](int tid, md_t const& msg) {
-            buffer[tid][msg.dst_id % thrd_num].emplace_back(msg);
+          thrd_num_msg, [&thrd_num_msg, &buffer](int tid, md_t const& msg) {
+            buffer[tid][msg.dst_id % thrd_num_msg].emplace_back(std::move(msg));
           });
+      LOG(INFO) << "frag-" << frag.fid() << " process1 time:" << grape::GetCurrentTime() - t1;
+      double t2 = grape::GetCurrentTime();
       {
-        std::vector<std::thread> threads(thrd_num);
-        for (uint32_t tid = 0; tid < thrd_num; ++tid) {
+        std::vector<std::thread> threads(thrd_num_msg);
+        for (uint32_t tid = 0; tid < thrd_num_msg; ++tid) {
           threads[tid] = std::thread(
-              [&frag, &ctx, &thrd_num, &buffer](uint32_t tid) {
-                for (uint32_t index = 0; index < thrd_num; ++index) {
+              [&frag, &ctx, &thrd_num_msg, &buffer](uint32_t tid) {
+                for (uint32_t index = 0; index < thrd_num_msg; ++index) {
                   for (auto const& msg : buffer[index][tid]) {
                     vertex_t v;
                     frag.InnerVertexGid2Vertex(msg.dst_id, v);
@@ -192,13 +199,14 @@ class LouvainAppBase
               },
               tid);
         }
-        for (uint32_t tid = 0; tid < thrd_num; ++tid) {
+        for (uint32_t tid = 0; tid < thrd_num_msg; ++tid) {
           threads[tid].join();
         }
       }
+      LOG(INFO) << "frag-" << frag.fid() << " process2 time:" << grape::GetCurrentTime() - t2;
     }
 
-    LOG(INFO) << "finish process msgs. time=" << grape::GetCurrrentTime() - begin;
+    LOG(INFO) << "frag-" << frag.fid() << " finish process msgs. time=" << grape::GetCurrentTime() - begin;
     begin = grape::GetCurrentTime();
 
     if (current_minor_step == phase_one_minor_step_1 && current_iteration > 0 &&
@@ -212,6 +220,7 @@ class LouvainAppBase
       ctx.set_halt(to_halt);
       if (ctx.halt()) {
         LOG(INFO) << "super step " << current_super_step << " decided to halt.";
+        messages.ForceContinue();
       }
       LOG(INFO) << "[INFO]: superstep: " << current_super_step
                 << " pass: " << current_iteration / 2
@@ -254,7 +263,7 @@ class LouvainAppBase
 
     ForEach(inner_vertices, [&frag, &ctx, this](int tid, vertex_t v) {
       if (ctx.compute_context().active(v)) {
-        LouvainVertex<fragment_t, vd_t, md_t> pregel_vertex;
+        thread_local LouvainVertex<fragment_t, vd_t, md_t> pregel_vertex;
         pregel_vertex.set_context(&ctx);
         pregel_vertex.set_fragment(&frag);
         pregel_vertex.set_compute_context(&ctx.compute_context());
@@ -294,7 +303,7 @@ class LouvainAppBase
 
     ctx.compute_context().clear_for_next_round();
 
-    LOG(INFO) << "finish computation and check all halted.time=" << grape::GetCurrrentTime() - begin;;
+    LOG(INFO) << "finish computation and check all halted.time=" << grape::GetCurrentTime() - begin;;
     if (!ctx.compute_context().all_halted()) {
       messages.ForceContinue();
     }
