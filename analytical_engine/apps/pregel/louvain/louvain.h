@@ -139,13 +139,13 @@ class PregelLouvain
       v.vote_to_halt();
       return;
     }
-    // at the start of each full pass check to see if progress is still being
-    // made, if not halt
+    // at the start of each full pass check to see wether progress is still
+    // being made, if not halt
     if (current_minor_step == phase_one_minor_step_1 && current_iteration > 0 &&
         current_iteration % 2 == 0) {
-      state.changed = 0;  // change count is per pass
+      state.changed = 0;  // reset changed.
       if (v.context()->halt()) {
-        // stage 2
+        // phase-1 halt, calculate current actual quality and return.
         double q = calculateActualQuality(v, context, messages);
         replaceNodeEdgesWithCommunityEdges(v, messages);
         v.context()->local_actual_quality()[v.tid()] += q;
@@ -180,7 +180,6 @@ class PregelLouvain
     context.aggregate(actual_quality_aggregator, quality);
   }
 
-  // Get the total edge weight of the graph.
   edata_t getTotalEdgeWeight(compute_context_t& context, pregel_vertex_t& v) {
     auto& state = v.state();
     if (state.reset_total_edge_weight) {
@@ -276,9 +275,9 @@ class PregelLouvain
       assert(best_community_id == c.community_id);
       state.community = c.community_id;
       state.community_sigma_total = c.community_sigma_total;
-      state.changed = 1;  // commuity changed.
+      state.changed = 1;  // community changed.
     }
-    // send node weight to the community hub to be summed in next super step
+    // send node weight to the community hub to sum in next super step
     md_t message(state.community, state.node_weight + state.internal_weight, 0,
                  vertex.get_gid(), state.community);
     vertex.send_by_gid(state.community, message);
