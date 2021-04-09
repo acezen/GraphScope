@@ -436,48 +436,48 @@ class KubernetesClusterLauncher(Launcher):
         )
         # volume1 is for vineyard ipc socket
         # MaxGraph: /home/maxgraph/data/vineyard
-        if self._exists_vineyard_daemonset(self._vineyard_daemonset):
-            vineyard_socket_volume_type = "hostPath"
-            vineyard_socket_volume_fields = {
-                "type": "Directory",
-                "path": "/var/run/vineyard-%s-%s"
-                % (self._namespace, self._vineyard_daemonset),
-            }
-        else:
-            vineyard_socket_volume_type = "emptyDir"
-            vineyard_socket_volume_fields = {}
-        engine_builder.add_volume(
-            VolumeBuilder(
-                name="vineyard-ipc-volume",
-                type=vineyard_socket_volume_type,
-                field=vineyard_socket_volume_fields,
-                mounts_list=[
-                    {"mountPath": "/tmp/vineyard_workspace"},
-                    {"mountPath": "/home/maxgraph/data/vineyard"},
-                ],
-            )
-        )
+        # if self._exists_vineyard_daemonset(self._vineyard_daemonset):
+        #     vineyard_socket_volume_type = "hostPath"
+        #     vineyard_socket_volume_fields = {
+        #         "type": "Directory",
+        #         "path": "/var/run/vineyard-%s-%s"
+        #         % (self._namespace, self._vineyard_daemonset),
+        #     }
+        # else:
+        #     vineyard_socket_volume_type = "emptyDir"
+        #     vineyard_socket_volume_fields = {}
+        # engine_builder.add_volume(
+        #     VolumeBuilder(
+        #         name="vineyard-ipc-volume",
+        #         type=vineyard_socket_volume_type,
+        #         field=vineyard_socket_volume_fields,
+        #         mounts_list=[
+        #             {"mountPath": "/tmp/vineyard_workspace"},
+        #             {"mountPath": "/home/maxgraph/data/vineyard"},
+        #         ],
+        #     )
+        # )
         # volume2 is for shared memory
-        engine_builder.add_volume(
-            VolumeBuilder(
-                name="host-shm",
-                type="emptyDir",
-                field={"medium": "Memory"},
-                mounts_list=[{"mountPath": "/dev/shm"}],
-            )
-        )
+        # engine_builder.add_volume(
+        #     VolumeBuilder(
+        #         name="host-shm",
+        #         type="emptyDir",
+        #         field={"medium": "Memory"},
+        #         mounts_list=[{"mountPath": "/dev/shm"}],
+        #     )
+        # )
         # volumes for test data
-        for name, volume in self._volumes.items():
-            volume_builder = resolve_volume_builder(name, volume)
-            if volume_builder is not None:
-                engine_builder.add_volume(volume_builder)
+        # for name, volume in self._volumes.items():
+        #     volume_builder = resolve_volume_builder(name, volume)
+        #     if volume_builder is not None:
+        #         engine_builder.add_volume(volume_builder)
 
         # add env
         engine_builder.add_simple_envs(
             {
                 "GLOG_v": str(self._glog_level),
                 "VINEYARD_IPC_SOCKET": "/tmp/vineyard_workspace/vineyard.sock",
-                "WITH_VINEYARD": "ON",
+                "WITH_VINEYARD": "OFF",
             }
         )
 
@@ -491,7 +491,7 @@ class KubernetesClusterLauncher(Launcher):
         )
 
         # add vineyard container
-        if not self._exists_vineyard_daemonset(self._vineyard_daemonset):
+        if not self._exists_vineyard_daemonset(self._vineyard_daemonset) or False:
             port = self._random_etcd_listen_client_service_port
             etcd_endpoints = ["http://%s:%s" % (self._etcd_service_name, port)]
             for i in range(self._etcd_num_pods):

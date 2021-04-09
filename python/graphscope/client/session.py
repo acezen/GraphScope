@@ -734,6 +734,7 @@ class Session(object):
             )
 
     def _connect(self):
+        from kubernetes import client
         if self._config_params["addr"] is not None:
             # try connect to exist coordinator
             self._coordinator_endpoint = self._config_params["addr"]
@@ -743,9 +744,12 @@ class Session(object):
                 or self._config_params["k8s_gs_image"] is None
             ):
                 raise K8sError("None image found.")
-            api_client = kube_config.new_client_from_config(
-                **self._config_params["k8s_client_config"]
-            )
+            if isinstance(self._config_params["k8s_client_config"], client.ApiClient):
+                api_client = self._config_params["k8s_client_config"]
+            else:
+                api_client = kube_config.new_client_from_config(
+                    **self._config_params["k8s_client_config"]
+                )
             self._launcher = KubernetesClusterLauncher(
                 api_client=api_client,
                 namespace=self._config_params["k8s_namespace"],
