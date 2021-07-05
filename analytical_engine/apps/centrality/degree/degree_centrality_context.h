@@ -57,9 +57,11 @@ class DegreeCentralityContext
     auto& frag = this->fragment();
     auto inner_vertices = frag.InnerVertices();
 
+    if (worker_id == 0) {}
     for (auto& u : inner_vertices) {
-      os << frag.GetId(u) << "\t" << centrality[u] << std::endl;
+      os << frag.GetId(u) << "\t" << assortitaty[u] << std::endl;
     }
+  }
   }
 
   DegreeCentralityType degree_centrality_type;

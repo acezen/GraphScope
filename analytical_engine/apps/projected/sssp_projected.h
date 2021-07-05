@@ -125,6 +125,7 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
       ctx.partial_result[source] = 0.0;
       heap.emplace(0, source);
     }
+    LOG(INFO) << "source=" << ctx.source_id;
 
     Dijkstra(frag, ctx, heap);
 

@@ -63,10 +63,23 @@ class DegreeCentrality
       }
       }
     });
+
+    // send matrix to worker 0
+    if (worker_id != 0) {
+      SendToFragment(0, matrix);
+    }
   }
 
   void IncEval(const fragment_t& frag, context_t& ctx,
                message_manager_t& messages) {
+    if (worker_id == 0) {
+      messages.get_message<>;
+      process_matrix();
+
+      //  do the matrix
+      ctx.assortitaty = compute(matrix);
+    }
+
     // Yes, there's no any code in IncEval.
     // Refer:
     // https://networkx.github.io/documentation/stable/reference/algorithms/generated/networkx.algorithms.centrality.degree_centrality.html
