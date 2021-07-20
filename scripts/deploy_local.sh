@@ -171,6 +171,9 @@ check_dependencies_version() {
       PACKAGES_TO_UPDATE = "${PACKAGES_TO_UPDATE} cmake"
     fi
   fi
+  if ! command -v go &> /dev/null; then
+    PACKAGES_TO_UPDATE = "${PACKAGES_TO_UPDATE} go"
+  fi
   if [[ "${PLATFORM}" == *"Darwin"* ]]; then
     if ! hash brew; then
       err "Homebrew is not installed. Please install Homebrew: https://docs.brew.sh/Installation."
@@ -332,9 +335,9 @@ install_dependencies() {
       brew install ${PACKAGES_TO_UPDATE}
     fi
     # brew install, if already installed, no need to update
-    HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1 brew install cmake double-conversion etcd protobuf \
+    HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1 brew install double-conversion etcd protobuf \
       apache-arrow openmpi boost glog gflags zstd snappy lz4 openssl@1.1 libevent \
-      fmt autoconf maven gnu-sed wget go
+      fmt autoconf maven gnu-sed wget
 
     # GraphScope require jdk8
     brew tap adoptopenjdk/openjdk
