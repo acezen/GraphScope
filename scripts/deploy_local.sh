@@ -332,13 +332,13 @@ install_dependencies() {
       brew install ${PACKAGES_TO_UPDATE}
     fi
     # brew install, if already installed, no need to update
-    HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake double-conversion etcd protobuf \
+    HOMEBREW_NO_INSTALL_UPGRADE=1 brew install cmake double-conversion etcd protobuf \
       apache-arrow openmpi boost glog gflags zstd snappy lz4 openssl@1.1 libevent \
       fmt autoconf maven gnu-sed wget go
 
     # GraphScope require jdk8
     brew tap adoptopenjdk/openjdk
-    HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask adoptopenjdk8
+    HOMEBREW_NO_INSTALL_UPGRADE=1 brew install --cask adoptopenjdk8
 
     write_envs_config
     source ${SOURCE_DIR}/gs_env
