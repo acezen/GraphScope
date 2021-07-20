@@ -9,8 +9,6 @@ set -o pipefail
 readonly RED="\033[0;31m"
 readonly YELLOW="\033[1;33m"
 readonly NC="\033[0m" # No Color
-# emoji
-readonly MUSCLE="\U1f4aa"
 
 readonly GRAPE_BRANCH="master" # libgrape-lite branch
 readonly V6D_BRANCH="main-v0.2.5" # vineyard branch
@@ -21,6 +19,7 @@ readonly NUM_PROC=$( $(command -v nproc &> /dev/null) && echo $(nproc) || echo $
 IS_IN_WSL=false && [[ ! -z "${IS_WSL}" || ! -z "${WSL_DISTRO_NAME}" ]] && IS_IN_WSL=true
 readonly IS_IN_WSL
 INSTALL_PREFIX=/usr/local
+PACKAGES_TO_UPDATE=
 PLATFORM=
 OS_VERSION=
 VERBOSE=false
@@ -60,7 +59,7 @@ warning() {
 }
 
 log() {
-  echo -e "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: [${MUSCLE}] $*" >&1
+  echo -e "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*" >&1
 }
 
 ##########################
@@ -149,12 +148,12 @@ check_os_compatibility() {
 check_dependencies_version() {
   log "Checking dependencies of install_deps command."
 
-  if ! hash sudo; then
+  if ! command -v sudo &> /dev/null; then
     err "sudo is not installed."
     exit 1
   fi
   # python3
-  if ! hash python3; then
+  if ! command -v python3 &> /dev/null;; then
     err "Python3 is not installed."
     exit 1
   fi
@@ -163,13 +162,22 @@ check_dependencies_version() {
     err "GraphScope requires python 3.6 or greater."
     exit 1
   fi
-
+  # cmake
+  if ! command -v cmake &> /dev/null; then
+    PACKAGES_TO_UPDATE = "${PACKAGES_TO_UPDATE} cmake"
+  else
+    ver=$(cmake --version 2>&1 | awk -F ' ' '/version/ {print $3}')
+    if "${ver}" -lt "3.1"; then
+      PACKAGES_TO_UPDATE = "${PACKAGES_TO_UPDATE} cmake"
+    fi
+  fi
   if [[ "${PLATFORM}" == *"Darwin"* ]]; then
     if ! hash brew; then
       err "Homebrew is not installed. Please install Homebrew: https://docs.brew.sh/Installation."
       exit 1
     fi
   fi
+  readonly PACKAGES_TO_UPDATE
 }
 
 ##########################
@@ -200,35 +208,45 @@ check_dependencies_of_deploy() {
     err "GraphScope requires python 3.6 or greater. Current version is ${python3 -V}"
     exit 1
   fi
-  # java
-  if ! command -v java &> /dev/null; then
-    err "JDK ${err_msg}. GraphScope require jdk8."
+  # cmake
+  if ! command -v cmake &> /dev/null; then
+    err "cmake ${err_msg}"
     exit 1
   fi
-  # if "${ver}" != "8"; then
-  #   err "GraphScope requires jdk8. Current version is jdk${ver}."
-  #   exit 1
-  # fi
+  ver=$(cmake --version 2>&1 | awk -F ' ' '/version/ {print $3}')
+  if "${ver}" -lt "3.1"; then
+    err "GraphScope require cmake 3.1 or greater. Current version is ${ver}."
+  fi
+  # java
+  if ! command -v java &> /dev/null; then
+    err "GraphScope require jdk8. JDK8 ${err_msg} or add JAVA_HOME/bin to PATH."
+    exit 1
+  fi
+  ver=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | awk -F '.' '{print $2}')
+  if "${ver}" != "8"; then
+    err "GraphScope requires jdk8. Current version is jdk${ver}."
+    exit 1
+  fi
   if ! command -v mvn &> /dev/null; then
-    echo "maven ${err_msg}"
+    err "maven ${err_msg}"
     exit 1
   fi
   if ! command -v cargo &> /dev/null; then
-    echo "cargo ${err_msg} or source ~/.cargo/env"
+    err "cargo ${err_msg} or source ~/.cargo/env"
     exit 1
   fi
   if ! command -v go &> /dev/null; then
-    echo "go ${err_msg}"
+    err "go ${err_msg}"
     exit 1
   fi
   if [[ "${PLATFORM}" == *"Darwin"* ]]; then
     if ! command -v clang &> /dev/null; then
-      echo "clang ${err_msg}. GraphScope require clang >=8, <=10."
+      err "clang ${err_msg}. GraphScope require clang >=8, <=10."
       exit 1
     fi
     ver=$(clang -v 2>&1 | head -n 1 | sed 's/.* \([0-9]*\)\..*/\1/')
     if [[ "${ver}" -lt "8" || "${ver}" -gt "10" ]]; then
-      echo "GraphScope requires clang >=8, <=10   MacOS. Current version is ${ver}."
+      err "GraphScope requires clang >=8, <=10   MacOS. Current version is ${ver}."
       exit 1
     fi
   fi
@@ -313,13 +331,17 @@ install_dependencies() {
     popd
     rm -fr /tmp/7.0.3.tar.gz /tmp/fmt-7.0.3
   elif [[ "${PLATFORM}" == *"Darwin"* ]]; then
-    brew install cmake double-conversion etcd protobuf apache-arrow openmpi \
-                 boost glog gflags zstd snappy lz4 openssl@1.1 libevent fmt \
-                 autoconf maven gnu-sed llvm@${LLVM_VERSION} wget
+    if [ -z "${PACKAGES_TO_UPDATE}" ]; then
+      # brew install/update PACKAGES_TO_UPDATE
+      brew install ${PACKAGES_TO_UPDATE}
+    # brew install, if already installed, no need to update
+    HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake double-conversion etcd protobuf \
+      apache-arrow openmpi boost glog gflags zstd snappy lz4 openssl@1.1 libevent \
+      fmt autoconf maven gnu-sed llvm@${LLVM_VERSION} wget go
 
     # GraphScope require jdk8
     brew tap adoptopenjdk/openjdk
-    brew install --cask adoptopenjdk8
+    HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask adoptopenjdk8
 
     write_envs_config
     source ${SOURCE_DIR}/gs_env
