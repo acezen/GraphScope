@@ -167,7 +167,7 @@ check_dependencies_version() {
     PACKAGES_TO_UPDATE = "${PACKAGES_TO_UPDATE} cmake"
   else
     ver=$(cmake --version 2>&1 | awk -F ' ' '/version/ {print $3}')
-    if "${ver}" -lt "3.1"; then
+    if [[ "${ver}" < "3.1" ]]; then
       PACKAGES_TO_UPDATE = "${PACKAGES_TO_UPDATE} cmake"
     fi
   fi
@@ -214,7 +214,7 @@ check_dependencies_of_deploy() {
     exit 1
   fi
   ver=$(cmake --version 2>&1 | awk -F ' ' '/version/ {print $3}')
-  if "${ver}" -lt "3.1"; then
+  if [[ "${ver}" < "3.1" ]]; then
     err "GraphScope require cmake 3.1 or greater. Current version is ${ver}."
   fi
   # java
@@ -223,7 +223,7 @@ check_dependencies_of_deploy() {
     exit 1
   fi
   ver=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | awk -F '.' '{print $2}')
-  if "${ver}" != "8"; then
+  if [[ "${ver}" != "8" ]]; then
     err "GraphScope requires jdk8. Current version is jdk${ver}."
     exit 1
   fi
@@ -327,9 +327,10 @@ install_dependencies() {
     popd
     rm -fr /tmp/7.0.3.tar.gz /tmp/fmt-7.0.3
   elif [[ "${PLATFORM}" == *"Darwin"* ]]; then
-    if [ -z "${PACKAGES_TO_UPDATE}" ]; then
+    if [ "${PACKAGES_TO_UPDATE}" != "" ]; then
       # brew install/update PACKAGES_TO_UPDATE
       brew install ${PACKAGES_TO_UPDATE}
+    fi
     # brew install, if already installed, no need to update
     HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake double-conversion etcd protobuf \
       apache-arrow openmpi boost glog gflags zstd snappy lz4 openssl@1.1 libevent \
