@@ -153,7 +153,7 @@ check_dependencies_version() {
     exit 1
   fi
   # python3
-  if ! command -v python3 &> /dev/null;; then
+  if ! command -v python3 &> /dev/null; then
     err "Python3 is not installed."
     exit 1
   fi
