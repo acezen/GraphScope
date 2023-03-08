@@ -101,20 +101,6 @@ struct ArgsUnpacker<double> {
 };
 
 /**
- * @brief A specialized ArgsUnpacker with float type
- */
-template <>
-struct ArgsUnpacker<float> {
-  using ProtoType = rpc::FloatValue;
-
-  static float unpack(const google::protobuf::Any& arg) {
-    ProtoType proto_arg;
-    arg.UnpackTo(&proto_arg);
-    return proto_arg.value();
-  }
-};
-
-/**
  * @brief A specialized ArgsUnpacker with std::string type
  */
 template <>

@@ -30,14 +30,14 @@ template <typename FRAG_T>
 class PRFlash : public FlashAppBase<FRAG_T, PR_TYPE> {
  public:
   INSTALL_FLASH_WORKER(PRFlash<FRAG_T>, PR_TYPE, FRAG_T)
-  using context_t = FlashVertexDataContext<FRAG_T, PR_TYPE, float>;
+  using context_t = FlashVertexDataContext<FRAG_T, PR_TYPE, double>;
 
   bool sync_all_ = false;
 
-  float* Res(value_t* v) { return &(v->res); };
+  double* Res(value_t* v) { return &(v->res); };
 
-  void Run(const fragment_t& graph, const  int max_iters, float damping = 0.85) {
-    Print("Run PageRank with Flash, max_iters = %d\n", max_iters);
+  void Run(const fragment_t& graph, const  int max_iters, double damping = 0.85) {
+    Print("Run PageRank with Flash, max_iters = %d, damping = %f\n", max_iters, damping);
     int n_vertex = graph.GetTotalVerticesNum();
     Print("Total vertices: %d\n", n_vertex);
 
@@ -47,9 +47,12 @@ class PRFlash : public FlashAppBase<FRAG_T, PR_TYPE> {
       v.deg = OutDeg(id);
     };
     VertexMap(All, CTrueV, init_v);
+    // for (auto &i:All.s) LOG(INFO) << "Init: " << i <<' '<< GetV(i)->res;
     Print("Init complete\n");
 
-    DefineMapE(update) { d.next += damping * s.res / s.deg; };
+    DefineMapE(update) {
+      d.next += damping * s.res / s.deg;
+    };
     DefineMapV(local) {
       v.res = v.next + (1 - damping) / n_vertex +
               (v.deg == 0 ? damping * v.res : 0);

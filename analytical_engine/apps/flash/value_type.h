@@ -74,7 +74,7 @@ struct BCC_TYPE {
 
 struct PR_TYPE {
   int deg;
-  float res, next;
+  double res, next;
 };
 
 struct HITS_TYPE {

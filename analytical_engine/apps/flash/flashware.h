@@ -89,9 +89,9 @@ class FlashWare : public grape::Communicator, public grape::ParallelEngine {
   inline int GetMasterPid(const vid_t& key) {
     return key2pid_[key];
   }
-  inline vid_t Key2Gid(const vid_t& key) {
-    return vmap_->Lid2Gid(key2pid_[key], Key2Lid(key, key2pid_[key]));
-  }
+  // inline vid_t Key2Gid(const vid_t& key) {
+  //   return vmap_->Lid2Gid(key2pid_[key], Key2Lid(key, key2pid_[key]));
+  // }
   inline vid_t Gid2Key(const vid_t& gid) {
     return Lid2Key(vmap_->GetLidFromGid(gid), vmap_->GetFidFromGid(gid));
   }
@@ -113,13 +113,13 @@ class FlashWare : public grape::Communicator, public grape::ParallelEngine {
   }
 
   inline vid_t Lid2Key(const vid_t& lid, const fid_t& pid) {
-    return vmap->GetOffsetFromLid(lid) + agg_vnum_[pid];
+    return vmap_->GetOffsetFromLid(lid) + agg_vnum_[pid];
   }
   inline vid_t Offset2Key(const vid_t& lid, const fid_t& pid) {
     return lid + agg_vnum_[pid];
   }
   inline vid_t Lid2Key(const vid_t& lid) {
-    return vmap->GetOffsetFromLid(lid) + agg_vnum_[pid_];
+    return vmap_->GetOffsetFromLid(lid) + agg_vnum_[pid_];
   }
   inline vid_t Offset2Key(const vid_t& lid) {
     return lid + agg_vnum_[pid_];
@@ -222,7 +222,7 @@ void FlashWare<fragment_t, value_t>::InitFlashWare(const grape::CommSpec& comm_s
     ForEach(graph->InnerVertices(),
             [this, &graph](int tid, typename fragment_t::vertex_t v) {
               auto dsts = graph->IOEDests(v);
-              vid_t lid = v.GetValue();
+              vid_t lid = vmap_->GetOffsetFromLid(v.GetValue());
               const fid_t* ptr = dsts.begin;
               while (ptr != dsts.end) {
                 fid_t fid = *(ptr++);

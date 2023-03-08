@@ -140,7 +140,7 @@ class ArrowProjectedVertexMap
     return id_parser_.GenerateId(label_id_, offset);
   }
 
-  vid_t GetOffsetFromLid(const vid_t& lid) {
+  vid_t GetOffsetFromLid(vid_t lid) {
     return id_parser_.GetOffset(lid);
   }
 
