@@ -95,16 +95,33 @@ class FlashWare : public grape::Communicator, public grape::ParallelEngine {
   inline vid_t Gid2Key(const vid_t& gid) {
     return Lid2Key(vmap_->GetLidFromGid(gid), vmap_->GetFidFromGid(gid));
   }
+
   inline vid_t Key2Lid(const vid_t& key, const fid_t& pid) {
+    return vmap_->Offset2Lid(key - agg_vnum_[pid]);
+  }
+
+  inline vid_t Key2Lid(const vid_t& key) {
+    return vmap_->Offset2Lid(key - agg_vnum_[pid_]);
+  }
+
+  inline vid_t Key2Offset(const vid_t& key, const fid_t& pid) {
     return key - agg_vnum_[pid];
   }
-  inline vid_t Lid2Key(const vid_t& lid, const fid_t& pid) {
-    return lid + agg_vnum_[pid];
-  }
-  inline vid_t Key2Lid(const vid_t& key) {
+
+  inline vid_t Key2Offset(const vid_t& key) {
     return key - agg_vnum_[pid_];
   }
+
+  inline vid_t Lid2Key(const vid_t& lid, const fid_t& pid) {
+    return vmap->GetOffsetFromLid(lid) + agg_vnum_[pid];
+  }
+  inline vid_t Offset2Key(const vid_t& lid, const fid_t& pid) {
+    return lid + agg_vnum_[pid];
+  }
   inline vid_t Lid2Key(const vid_t& lid) {
+    return vmap->GetOffsetFromLid(lid) + agg_vnum_[pid_];
+  }
+  inline vid_t Offset2Key(const vid_t& lid) {
     return lid + agg_vnum_[pid_];
   }
 
@@ -349,7 +366,7 @@ inline void FlashWare<fragment_t, value_t>::SendCurrent(
 template <typename fragment_t, class value_t>
 inline void FlashWare<fragment_t, value_t>::SynchronizeCurrent(
     const int& tid, const vid_t& key) {
-  vid_t x = Key2Lid(key) * n_procs_;
+  vid_t x = Key2Offset(key) * n_procs_;
   for (fid_t i = 0; i < n_procs_; i++)
     if (i != pid_ && (sync_all_ || (nb_ids_.get_bit(x + i))))
       SendCurrent(i, key, tid);
@@ -358,7 +375,7 @@ inline void FlashWare<fragment_t, value_t>::SynchronizeCurrent(
 template <typename fragment_t, class value_t>
 inline void FlashWare<fragment_t, value_t>::SynchronizeNext(
     const int& tid, const vid_t& key) {
-  vid_t x = Key2Lid(key) * n_procs_;
+  vid_t x = Key2Offset(key) * n_procs_;
   for (fid_t i = 0; i < n_procs_; i++)
     if (i != pid_ && (sync_all_ || (nb_ids_.get_bit(x + i))))
       SendNext(i, key, tid);
