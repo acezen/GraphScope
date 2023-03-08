@@ -101,6 +101,20 @@ struct ArgsUnpacker<double> {
 };
 
 /**
+ * @brief A specialized ArgsUnpacker with float type
+ */
+template <>
+struct ArgsUnpacker<float> {
+  using ProtoType = rpc::FloatValue;
+
+  static float unpack(const google::protobuf::Any& arg) {
+    ProtoType proto_arg;
+    arg.UnpackTo(&proto_arg);
+    return proto_arg.value();
+  }
+};
+
+/**
  * @brief A specialized ArgsUnpacker with std::string type
  */
 template <>
@@ -203,6 +217,31 @@ class AppInvoker {
   }
 };
 
+template <typename APP_T>
+class FlashAppInvoker {
+  using worker_t = typename APP_T::worker_t;
+  using app_run_func_t = decltype(&APP_T::Run);
+
+  template <std::size_t... I>
+  static void query_impl(std::shared_ptr<worker_t> worker,
+                         const rpc::QueryArgs& query_args,
+                         std::index_sequence<I...>) {
+    worker->Query(
+        ArgsUnpacker<typename std::remove_const<typename std::remove_reference<
+            typename ArgTypeAt<I + 1, app_run_func_t>::type>::type>::
+                         type>::unpack(query_args.args(I))...);
+  }
+
+ public:
+  static bl::result<nullptr_t> Query(std::shared_ptr<worker_t> worker,
+                                     const rpc::QueryArgs& query_args) {
+    constexpr std::size_t args_num = ArgsNum<app_run_func_t>::value - 1;
+    // There maybe default argument
+    CHECK_OR_RAISE(args_num >= query_args.args_size());
+    query_impl(worker, query_args, std::make_index_sequence<args_num>());
+    return nullptr;
+  }
+};
 }  // namespace gs
 
 #endif  // ANALYTICAL_ENGINE_CORE_APP_APP_INVOKER_H_

@@ -264,7 +264,7 @@ app:
       - gs::ArrowProjectedFragment
       - gs::DynamicProjectedFragment
   - algo: flash_pagerank
-    type: cpp_pie
+    type: cpp_flash
     class_name: gs::PRFlash
     src: apps/flash/ranking/pagerank.h
     compatible_graph:
