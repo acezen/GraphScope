@@ -35,22 +35,20 @@ class EigenvectorCentralityContext
 
   void Init(grape::ParallelMessageManager& messages, double tolerance,
             int max_round) {
-    auto& frag = this->fragment();
-    auto vertices = frag.Vertices();
-
-    x.SetValue(1.0 / frag.GetTotalVerticesNum());
-    x_last.Init(vertices, 1.0 / frag.GetTotalVerticesNum());
+    // x.SetValue(1.0 / frag.GetTotalVerticesNum());
+    // x_last.Init(vertices, 1.0 / frag.GetTotalVerticesNum());
 
     this->tolerance = tolerance;
     this->max_round = max_round;
     curr_round = 0;
+    LOG(INFO) << "Finished init";
   }
 
   void Output(std::ostream& os) override {
     auto& frag = this->fragment();
     auto inner_vertices = frag.InnerVertices();
 
-    for (auto& u : inner_vertices) {
+    for (const auto& u : inner_vertices) {
       os << frag.GetId(u) << "\t" << x[u] << std::endl;
     }
   }
@@ -61,6 +59,7 @@ class EigenvectorCentralityContext
   double tolerance;
   int max_round;
   int curr_round;
+  size_t graph_vnum = 0;
 };
 }  // namespace gs
 

@@ -30,7 +30,6 @@ template <typename FRAG_T>
 class PageRankNetworkXContext
     : public grape::VertexDataContext<FRAG_T, double> {
   using oid_t = typename FRAG_T::oid_t;
-  using vid_t = typename FRAG_T::vid_t;
   using vertex_t = typename FRAG_T::vertex_t;
 
  public:
@@ -44,12 +43,101 @@ class PageRankNetworkXContext
     auto inner_vertices = frag.InnerVertices();
     auto vertices = frag.Vertices();
 
+    /*
+    double t = grape::GetCurrentTime();
+    for (const auto& v : inner_vertices) {
+      ;
+    }
+    grape::Vertex v(0);
+    auto it = inner_vertices.begin_;
+    auto end = inner_vertices.end_;
+    while (it != end) {
+      grin_get_vertex_from_opt(static_cast<GRIN_GRAPH>(&v), inner_vertices.vl_, it);
+      // grin_destroy_vertex(inner_vertices.g_, v);
+      ++it;
+    }
+    // auto it = inner_vertices.begin();
+    // auto end = inner_vertices.end();
+    // while (it != end) {
+    //  auto& v = *it;
+    //   ++it;
+    // }
+    LOG_IF(INFO, frag.fid() == 0) << "Iterate vertices: " << grape::GetCurrentTime() - t << " seconds ";
+
+    t = grape::GetCurrentTime();
+    auto it = inner_vertices.begin_;
+    auto end = inner_vertices.end_;
+    grape::Vertex v(it);
+    grape::Vertex nv(it);
+    auto grinv = static_cast<GRIN_VERTEX>(&nv);
+    vertex_t gv(inner_vertices.g_, static_cast<GRIN_VERTEX>(&v));
+    vertex_t egv(inner_vertices.g_, static_cast<GRIN_VERTEX>(&nv));
+    while (it != end) {
+      // grin_get_vertex_from_opt(static_cast<GRIN_GRAPH>(&v), inner_vertices.vl_, it);
+      // grin_destroy_vertex(inner_vertices.g_, v);
+      auto es = frag.GetIncomingAdjList(gv);
+      auto eit = es.begin();
+      auto eend = es.end();
+      for (auto eit = es.begin(); eit != eend; ++eit) {
+        eit->get_neighbor(egv);
+        // nei.grin_v = nullptr;
+        // e.get_neighbor();
+      }
+      // for (auto& e : es) {
+      //   e.get_neighbor();
+      // }
+      ++it;
+    }
+    egv.grin_v = nullptr;
+    gv.grin_v = nullptr;
+    for (const auto& v : inner_vertices) {
+      auto es = frag.GetIncomingAdjList(v);
+      for (auto& e : es) {
+        auto u = e.get_neighbor();
+      }
+    }
+    LOG_IF(INFO, frag.fid() == 0) << "Iterate Edges: " << grape::GetCurrentTime() - t << " seconds ";
+    // Arrow: 0.964705s
+    // GRIN: 5.27114s
+    // GRIN with IsInnerVertex(true): 1.29798s
+    double t = grape::GetCurrentTime();
+    size_t count = 0;
+    for (const auto& v : inner_vertices) {
+      auto es = frag.GetIncomingAdjList(v);
+      for (auto& e : es) {
+        auto u = e.get_neighbor();
+        if (frag.IsInnerVertex(u)) {
+          ++count;
+        }
+      }
+    }
+    */
+    // LOG_IF(INFO, frag.fid() == 0) << "Iterate Edges: " << grape::GetCurrentTime() - t << " seconds " << count;
+
     this->alpha = alpha;
     this->max_round = max_round;
     this->tolerance = tolerance;
     degree.Init(inner_vertices, 0);
     result.SetValue(0.0);
     pre_result.Init(vertices, 0.0);
+    // GRIN: 20.9127s
+    // GRIN-get_neighbor_directly: 17.6011s
+    // GRIN-adj_list_no_destroy: 15.4245s
+    // GRIN-relace all grin function with its implement: 12.8841s
+    // GRIN-get location with v.grin_v: 8.5274s
+    // ARROW: 7.89582s
+    /*
+    double t = grape::GetCurrentTime();
+    double cur = 0;
+    for (const auto& v : inner_vertices) {
+      auto es = frag.GetIncomingAdjList(v);
+      for (auto& e : es) {
+        auto u = e.get_neighbor();
+        cur += pre_result[u];
+      }
+    }
+    LOG_IF(INFO, frag.fid() == 0) << "Iterate Edges: " << grape::GetCurrentTime() - t << " seconds " << cur;
+    */
     step = 0;
   }
 
@@ -66,13 +154,14 @@ class PageRankNetworkXContext
   typename FRAG_T::template vertex_array_t<double>& result;
   typename FRAG_T::template vertex_array_t<double> pre_result;
 
-  vid_t dangling_vnum = 0;
+  uint64_t dangling_vnum = 0;
   int step = 0;
   int max_round = 0;
   double alpha = 0;
   double tolerance;
 
   double dangling_sum = 0.0;
+  size_t graph_vnum = 0;
 };
 }  // namespace gs
 

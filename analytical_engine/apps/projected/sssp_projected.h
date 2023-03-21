@@ -76,13 +76,12 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
   // sequential Dijkstra algorithm for SSSP.
   void Dijkstra(const fragment_t& frag, context_t& ctx,
                 std::priority_queue<std::pair<double, vertex_t>>& heap) {
-    auto inner_vertices = frag.InnerVertices();
+    // auto inner_vertices = frag.InnerVertices();
 
     double distu, distv, ndistv;
-    vertex_t v, u;
 
     while (!heap.empty()) {
-      u = heap.top().second;
+      auto u = heap.top().second;
       distu = -heap.top().first;
       heap.pop();
 
@@ -92,8 +91,8 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
       ctx.modified[u] = true;
 
       auto es = frag.GetOutgoingAdjList(u);
-      for (auto& e : es) {
-        v = e.get_neighbor();
+      for (const auto& e : es) {
+        auto v = e.get_neighbor();
         distv = ctx.partial_result[v];
         double edata = 1.0;
         vineyard::static_if<!std::is_same<edata_t, grape::EmptyType>{}>(
@@ -116,6 +115,7 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
  public:
   void PEval(const fragment_t& frag, context_t& ctx,
              grape::DefaultMessageManager& messages) {
+    LOG_IF(INFO, frag.fid() == 0) << "PEval";
     vertex_t source;
     bool native_source = frag.GetInnerVertex(ctx.source_id, source);
 
@@ -129,7 +129,7 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
     Dijkstra(frag, ctx, heap);
 
     auto outer_vertices = frag.OuterVertices();
-    for (auto v : outer_vertices) {
+    for (const auto& v : outer_vertices) {
       if (ctx.modified[v]) {
         messages.SyncStateOnOuterVertex<FRAG_T, double>(frag, v,
                                                         ctx.partial_result[v]);
@@ -141,6 +141,7 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
 
   void IncEval(const fragment_t& frag, context_t& ctx,
                grape::DefaultMessageManager& messages) {
+    LOG_IF(INFO, frag.fid() == 0) << "IncEval";
     auto inner_vertices = frag.InnerVertices();
 
     std::priority_queue<std::pair<double, vertex_t>> heap;
@@ -156,7 +157,7 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
       }
     }
 
-    for (auto& v : inner_vertices) {
+    for (const auto& v : inner_vertices) {
       if (ctx.modified[v]) {
         heap.emplace(-ctx.partial_result[v], v);
         ctx.modified[v] = false;
@@ -166,7 +167,7 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
     Dijkstra(frag, ctx, heap);
 
     auto outer_vertices = frag.OuterVertices();
-    for (auto v : outer_vertices) {
+    for (const auto& v : outer_vertices) {
       if (ctx.modified[v]) {
         messages.SyncStateOnOuterVertex<FRAG_T, double>(frag, v,
                                                         ctx.partial_result[v]);

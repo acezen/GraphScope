@@ -4,6 +4,10 @@ file(READ ${CMAKE_CURRENT_SOURCE_DIR}/../VERSION GRAPHSCOPE_ANALYTICAL_VERSION)
 # Strip trailing newline
 string(REGEX REPLACE "\n$" "" GRAPHSCOPE_ANALYTICAL_VERSION "${GRAPHSCOPE_ANALYTICAL_VERSION}")
 
+cmake_policy(SET CMP0069 NEW)
+
+
+
 if (POLICY CMP0048)
     cmake_policy(SET CMP0048 NEW)
 endif ()
@@ -14,6 +18,7 @@ option(NETWORKX "networkx on?" ON)
 option(BUILD_TESTS "Build unit test" ON)
 option(ENABLE_JAVA_SDK "Build with support for java sdk" ON)
 option(LET_IT_CRASH_ON_EXCEPTION "Disable boost leaf's error handling and let it crash when exception occurs to help debugging" OFF)
+option(BUILD_GRIN "Build unit test" ON)
 
 # Get system processor
 execute_process(COMMAND uname -m OUTPUT_VARIABLE SYSTEM_PROCESSOR)
@@ -452,7 +457,54 @@ if (BUILD_TESTS)
     endif ()
 endif ()
 
-# cpplint
+# find_package(etcd-cpp-api REQUIRED)
+if (BUILD_GRIN)
+    if(CMAKE_VERSION VERSION_GREATER "3.9" AND
+        (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
+        include(CheckIPOSupported)
+        check_ipo_supported(RESULT lpo_supported OUTPUT lpo_supported_error)
+        if(lpo_supported)
+            message(STATUS "IPO / LTO enabled")
+            set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+        else()
+            message(STATUS "IPO / LTO not supported: '${lpo_supported_error}'")
+        endif()
+    endif()
+    message(STATUS "${CMAKE_CURRENT_SOURCE_DIR}" ${${CMAKE_CURRENT_SOURCE_DIR}})
+    file(GLOB_RECURSE GRIN_SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}" "grin/*.cc")
+    list(REMOVE_ITEM GRIN_SRC_FILES "/root/grin/GraphScope/analytical_engine/grin/src/proto/message.cc")
+    message(STATUS "GRIN_SRC_FILES" ${GRIN_SRC_FILES})
+
+    find_package(etcd-cpp-api REQUIRED)
+    macro(add_grin_vineyard_app target)
+        set(options)
+        set(oneValueArgs)
+        set(multiValueArgs SRCS)
+        cmake_parse_arguments(add_grin_vineyard_app "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+        add_executable(${target} ${add_grin_vineyard_app_SRCS} ${GRIN_SRC_FILES})
+        # add_executable(${target} ${add_grin_vineyard_app_SRCS})
+        target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /root/grin_weibin/v6d/modules/graph/thirdparty)
+        # target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /root/grin/GART/interfaces /root/grin/GART /root/grin/GART/vegito/src)
+        # target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /Users/weibin/Dev/gart_grin/research/gart /Users/weibin/Dev/gart_grin/research /Users/weibin/Dev/gart_grin/research/gart/vegito/src)
+        # target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /home/gsbot/weibin/gart/research/gart /home/gsbot/weibin/gart/research /home/gsbot/weibin/gart/research/gart/vegito/src)
+        # target_link_libraries(${target} gs_proto ${LIBGRAPELITE_LIBRARIES} ${VINEYARD_LIBRARIES} ${ETCD_CPP_LIBRARIES})
+        # target_link_libraries(${target} "/Users/weibin/Dev/grin-v6d/build/shared-lib/libvineyard_grin.dylib")
+        # target_link_libraries(${target} "/Users/weibin/Dev/gart_grin/research/gart/grin/build/libgart_grin.dylib")
+        # target_link_libraries(${target} "/home/gsbot/weibin/gart/research/gart/grin/build/libgart_grin.so")
+        message(STATUS ${VINEYARD_LIBRARIES})
+        target_link_libraries(${target} PRIVATE gs_proto ${LIBGRAPELITE_LIBRARIES} ${VINEYARD_LIBRARIES} ${ETCD_CPP_LIBRARIES})
+        if (${LIBUNWIND_FOUND})
+            target_link_libraries(${target} PRIVATE ${LIBUNWIND_LIBRARIES})
+        endif ()
+        target_link_libraries(${target} PRIVATE OpenMP::OpenMP_CXX)
+    endmacro()
+
+    message(STATUS ${VINEYARD_INCLUDE_DIRS})
+    # add_grin_vineyard_app(run_gart_test SRCS core/grin/test/run_gart_test.cc)
+    add_grin_vineyard_app(run_grin_app SRCS core/grin/test/run_grin_app.cc)
+endif ()
+
+# Cpplint
 file(GLOB_RECURSE FILES_NEED_LINT
         "apps/*.cc"
         "apps/*.h"

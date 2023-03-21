@@ -53,20 +53,21 @@ class PageRankNetworkX
   PageRankNetworkX() {}
   void PEval(const fragment_t& frag, context_t& ctx,
              message_manager_t& messages) {
+    LOG_IF(INFO, frag.fid() == 0) << "PEval";
     auto inner_vertices = frag.InnerVertices();
 
-    size_t graph_vnum = frag.GetTotalVerticesNum();
+    Sum(frag.GetInnerVerticesNum(), ctx.graph_vnum);
     messages.InitChannels(thread_num());
 
     ctx.step = 0;
-    double p = 1.0 / graph_vnum;
+    double p = 1.0 / ctx.graph_vnum;
 
     // assign initial ranks
     ForEach(inner_vertices.begin(), inner_vertices.end(),
-            [&ctx, &frag, p, &messages](int tid, vertex_t u) {
+            [&ctx, &frag, p, &messages](int tid, const vertex_t& u) {
               ctx.result[u] = p;
               ctx.degree[u] =
-                  static_cast<double>(frag.GetOutgoingAdjList(u).Size());
+                  static_cast<double>(frag.GetLocalOutDegree(u));
               if (ctx.degree[u] != 0.0) {
                 messages.SendMsgThroughOEdges<fragment_t, double>(
                     frag, u, ctx.result[u] / ctx.degree[u], tid);
@@ -89,34 +90,38 @@ class PageRankNetworkX
 
   void IncEval(const fragment_t& frag, context_t& ctx,
                message_manager_t& messages) {
+    LOG_IF(INFO, frag.fid() == 0) << "IncEval";
     auto inner_vertices = frag.InnerVertices();
 
     double dangling_sum = ctx.dangling_sum;
 
-    size_t graph_vnum = frag.GetTotalVerticesNum();
-
     ++ctx.step;
+    double t = grape::GetCurrentTime();
     // process received ranks sent by other workers
     {
       messages.ParallelProcess<fragment_t, double>(
-          thread_num(), frag, [&ctx](int tid, vertex_t u, const double& msg) {
+          thread_num(), frag, [&ctx](int tid, const vertex_t& u, const double& msg) {
             ctx.result[u] = msg;
             ctx.pre_result[u] = msg;
           });
     }
+    LOG_IF(INFO, frag.fid() == 0) << "Message process: " << grape::GetCurrentTime() - t << " seconds";
 
+    t = grape::GetCurrentTime();
     ForEach(inner_vertices.begin(), inner_vertices.end(),
-            [&ctx](int tid, vertex_t u) {
+            [&ctx](int tid, const vertex_t& u) {
               if (ctx.degree[u] > 0.0) {
                 ctx.pre_result[u] = ctx.result[u] / ctx.degree[u];
               } else {
                 ctx.pre_result[u] = ctx.result[u];
               }
             });
+    LOG_IF(INFO, frag.fid() == 0) << "Process pre_result: " << grape::GetCurrentTime() - t << " seconds";
 
-    double base = (1.0 - ctx.alpha) / graph_vnum + dangling_sum / graph_vnum;
+    t = grape::GetCurrentTime();
+    double base = (1.0 - ctx.alpha) / ctx.graph_vnum + dangling_sum / ctx.graph_vnum;
     ForEach(inner_vertices.begin(), inner_vertices.end(),
-            [&ctx, base, &frag](int tid, vertex_t u) {
+            [&ctx, base, &frag](int tid, const vertex_t& u) {
               double cur = 0;
               if (frag.directed()) {
                 auto es = frag.GetIncomingAdjList(u);
@@ -132,9 +137,11 @@ class PageRankNetworkX
               ctx.result[u] = cur * ctx.alpha + base;
             });
 
+    LOG_IF(INFO, frag.fid() == 0) << "Compute: " << grape::GetCurrentTime() - t << " seconds";
+    t = grape::GetCurrentTime();
     double eps = 0.0;
     ctx.dangling_sum = 0.0;
-    for (auto& v : inner_vertices) {
+    for (const auto& v : inner_vertices) {
       if (ctx.degree[v] > 0.0) {
         eps += fabs(ctx.result[v] - ctx.pre_result[v] * ctx.degree[v]);
       } else {
@@ -144,17 +151,18 @@ class PageRankNetworkX
     }
     double total_eps = 0.0;
     Sum(eps, total_eps);
-    if (total_eps < ctx.tolerance * graph_vnum || ctx.step > ctx.max_round) {
+    if (total_eps < ctx.tolerance * ctx.graph_vnum || ctx.step > ctx.max_round) {
       return;
     }
 
     ForEach(inner_vertices.begin(), inner_vertices.end(),
-            [&ctx, &frag, &messages](int tid, vertex_t u) {
+            [&ctx, &frag, &messages](int tid, const vertex_t& u) {
               if (ctx.degree[u] > 0) {
                 messages.SendMsgThroughOEdges<fragment_t, double>(
                     frag, u, ctx.result[u] / ctx.degree[u], tid);
               }
             });
+    LOG_IF(INFO, frag.fid() == 0) << "Update: " << grape::GetCurrentTime() - t << " seconds";
 
     double new_dangling = ctx.alpha * static_cast<double>(ctx.dangling_sum);
     Sum(new_dangling, ctx.dangling_sum);
