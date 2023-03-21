@@ -177,6 +177,11 @@ class Nbr {
     return grape::Vertex<vid_t>(nbr_->vid);
   }
 
+  void  get_neighbor(grape::Vertex<vid_t>& v) const {
+    v.SetValue(nbr_->vid);
+    // return grape::Vertex<vid_t>(nbr_->vid);
+  }
+
   eid_t edge_id() const { return nbr_->eid; }
 
   typename TypedArray<EDATA_T>::value_type data() const {
@@ -742,6 +747,8 @@ class ArrowProjectedFragment
   using edata_t = EDATA_T;
   using property_graph_t =
       vineyard::ArrowFragment<oid_t, vid_t, property_vertex_map_t, COMPACT>;
+
+  // using vertex_set_t = grape::DenseVertexSet<typename vertex_range_t>;
 
   using vid_array_t = typename vineyard::ConvertToArrowType<vid_t>::ArrayType;
   using eid_array_t = typename vineyard::ConvertToArrowType<eid_t>::ArrayType;

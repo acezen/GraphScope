@@ -70,7 +70,7 @@ class EigenvectorCentrality
     std::vector<double> thread_local_delta_sum(thrd_num, 0.0);
     double local_delta_sum = 0, global_delta_sum = 0;
     ForEach(inner_vertices.begin(), inner_vertices.end(),
-            [&thread_local_delta_sum, &ctx, &norm](int tid, vertex_t v) {
+            [&thread_local_delta_sum, &ctx, &norm](int tid, const vertex_t& v) {
               ctx.x[v] /= norm;
               thread_local_delta_sum[tid] += std::abs(ctx.x[v] - ctx.x_last[v]);
             });
@@ -79,7 +79,7 @@ class EigenvectorCentrality
     }
     Sum(local_delta_sum, global_delta_sum);
     VLOG(1) << "[step - " << ctx.curr_round << " ] Diff: " << global_delta_sum;
-    if (global_delta_sum < frag.GetTotalVerticesNum() * ctx.tolerance ||
+    if (global_delta_sum < ctx.graph_vnum * ctx.tolerance ||
         ctx.curr_round >= ctx.max_round) {
       VLOG(1) << "Eigenvector centrality terminates after " << ctx.curr_round
               << " iterations. Diff: " << global_delta_sum;
@@ -97,7 +97,7 @@ class EigenvectorCentrality
     if (frag.directed()) {
       ForEach(
           inner_vertices.begin(), inner_vertices.end(),
-          [&x, &x_last, &frag](int tid, vertex_t v) {
+          [&x, &x_last, &frag](int tid, const vertex_t& v) {
             auto es = frag.GetIncomingAdjList(v);
             x[v] = x_last[v];
             for (auto& e : es) {
@@ -112,7 +112,7 @@ class EigenvectorCentrality
     } else {
       ForEach(
           inner_vertices.begin(), inner_vertices.end(),
-          [&x, &x_last, &frag](int tid, vertex_t v) {
+          [&x, &x_last, &frag](int tid, const vertex_t& v) {
             auto es = frag.GetOutgoingAdjList(v);
             x[v] = x_last[v];
             for (auto& e : es) {
@@ -129,6 +129,11 @@ class EigenvectorCentrality
 
   void PEval(const fragment_t& frag, context_t& ctx,
              message_manager_t& messages) {
+    auto vertices = frag.Vertices();
+    Sum(frag.GetInnerVerticesNum(), ctx.graph_vnum);
+    ctx.x.SetValue(1.0 / ctx.graph_vnum);
+    ctx.x_last.Init(vertices, 1.0 / ctx.graph_vnum);
+
     int thrd_num = thread_num();
     messages.InitChannels(thread_num());
     Pull(frag, ctx, messages);
@@ -143,7 +148,7 @@ class EigenvectorCentrality
       messages.ForceContinue();
     } else {
       ForEach(inner_vertices.begin(), inner_vertices.end(),
-              [&ctx, &frag, &messages](int tid, vertex_t v) {
+              [&ctx, &frag, &messages](int tid, const vertex_t& v) {
                 messages.Channels()[tid].SendMsgThroughOEdges(frag, v,
                                                               ctx.x[v]);
               });
@@ -159,7 +164,7 @@ class EigenvectorCentrality
     auto inner_vertices = frag.InnerVertices();
 
     messages.ParallelProcess<fragment_t, double>(
-        thrd_num, frag, [&x](int tid, vertex_t v, double msg) { x[v] = msg; });
+        thrd_num, frag, [&x](int tid, const vertex_t& v, double msg) { x[v] = msg; });
 
     x_last.Swap(x);
 
@@ -172,7 +177,7 @@ class EigenvectorCentrality
       messages.ForceContinue();
     } else {
       ForEach(inner_vertices.begin(), inner_vertices.end(),
-              [&ctx, &frag, &messages](int tid, vertex_t v) {
+              [&ctx, &frag, &messages](int tid, const vertex_t& v) {
                 messages.Channels()[tid].SendMsgThroughOEdges(frag, v,
                                                               ctx.x[v]);
               });
