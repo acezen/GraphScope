@@ -72,7 +72,7 @@ void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
   }
   double start = grape::GetCurrentTime();
 
-  worker->Query(0.85, 10, 1e-6);
+  worker->Query(0.85, 10, 1e-9);
   MPI_Barrier(comm_spec.comm());
   if (comm_spec.worker_id() == 0) {
     LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << "seconds";
@@ -230,7 +230,7 @@ void Run(const std::string& ipc_socket, vineyard::Client& client,
   auto frag = GetFragment<FRAG_T>(ipc_socket, client, comm_spec, fragment_group_id);
 
   if (app_name == "pagerank") {
-    RunProjectedPR<FRAG_T>(frag, comm_spec, "/tmp/output_pr2");
+    RunProjectedPR<FRAG_T>(frag, comm_spec, "/tmp/output_pr");
   } else if (app_name == "eigenvector") {
     RunProjectedEigen<FRAG_T>(frag, comm_spec, "output_eigen");
   } else if (app_name == "sssp") {
