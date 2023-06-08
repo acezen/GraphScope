@@ -26,6 +26,7 @@
 
 #include "core/object/app_entry.h"
 extern "C" {
+#include "graph/grin/predefine.h"
 #include "grin/include/topology/structure.h"
 #include "grin/include/topology/vertexlist.h"
 #include "grin/include/topology/adjacentlist.h"
@@ -707,27 +708,22 @@ class GRINFlattenedFragment {
         : pg_(partitioned_graph), partition_(partition), v_prop_(v_prop_name), e_prop_(e_prop_name) {
     g_ = grin_get_local_graph_by_partition(pg_, partition_);
     tvnum_ = ivnum_ = ovnum_ = 0;
-    tvl_ = grin_get_vertex_list(g_);
-    ivl_ = grin_select_master_for_vertex_list(g_, tvl_);
-    ovl_ = grin_select_mirror_for_vertex_list(g_, tvl_);
+    vtl_ = grin_get_vertex_type_list(g_);
+    etl_ = grin_get_edge_type_list(g_);
+    auto vt = grin_get_vertex_type_from_list(g_, vtl_, 0);
+    tvl_ = grin_get_vertex_list_by_type(g_, vt);
+    ivl_ = grin_get_vertex_list_by_type_select_master(g_, vt);
+    ovl_ = grin_get_vertex_list_by_type_select_mirror(g_, vt);
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     tvnum_ = grin_get_vertex_list_size(g_, tvl_);
     ivnum_ = grin_get_vertex_list_size(g_, ivl_);
     ovnum_ = grin_get_vertex_list_size(g_, ovl_);
 
-    // epts_ = std::make_shared<property_table_vec_t>();
-    /*
-    auto etl = grin_get_edge_type_list(g_);
-    auto etl_size = grin_get_edge_type_list_size(g_, etl);
-    for (size_t i = 0; i < etl_size; ++i) {
-      auto e_label = grin_get_edge_type_from_list(g_, etl, i);
-      // epts_->push_back(grin_get_edge_property_table_by_type(g_, e_label));
-    }
-    */
+    auto et = grin_get_edge_type_from_list(g_, etl_, 0);
     auto inner_verices = this->InnerVertices();
     for (const auto& v : inner_verices) {
-      v2iadj_[v.grin_v] = grin_get_adjacent_list(g_, GRIN_DIRECTION::IN, v.grin_v);
-      v2oadj_[v.grin_v] = grin_get_adjacent_list(g_, GRIN_DIRECTION::OUT, v.grin_v);
+      v2iadj_[v.grin_v] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v.grin_v, et);
+      v2oadj_[v.grin_v] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v.grin_v, et);
     }
 #elif defined(GRIN_ENABLE_VERTEX_LIST_ITERATOR)
     auto iter = grin_get_vertex_list_begin(g_, tvl_);
@@ -744,13 +740,14 @@ class GRINFlattenedFragment {
     index = 0;
     auto iv_iter = grin_get_vertex_list_begin(g_, ivl_);
     iv2i_ = std::make_shared<v2index_t>();
+    auto et = grin_get_edge_type_from_list(g_, etl_, 0);
     while (!grin_is_vertex_list_end(g_, iv_iter)) {
         auto v = grin_get_vertex_from_iter(g_, iv_iter);
         (*iv2i_)[v] = index;
         ++index;
         ++ivnum_;
-        v2iadj_[v] = grin_get_adjacent_list(g_, GRIN_DIRECTION::IN, v);
-        v2oadj_[v] = grin_get_adjacent_list(g_, GRIN_DIRECTION::OUT, v);
+        v2iadj_[v] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v, et);
+        v2oadj_[v] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v, et);
         grin_destroy_vertex(g_, v);
         grin_get_next_vertex_list_iter(g_, iv_iter);
     }
@@ -845,6 +842,8 @@ class GRINFlattenedFragment {
     for (const auto& pair : v2oadj_) {
       grin_destroy_adjacent_list(g_, pair.second);
     }
+    grin_destroy_vertex_type_list(g_, vtl_);
+    grin_destroy_edge_type_list(g_, etl_);
     grin_destroy_graph(g_);
   }
 
@@ -884,10 +883,6 @@ class GRINFlattenedFragment {
 
 #ifdef GRIN_ENABLE_VERTEX_ORIGINAL_ID_OF_INT64
   bool GetVertex(oid_t& oid, vertex_t& v) const {
-    // if (GRIN_DATATYPE_ENUM<oid_t>::value != grin_get_vertex_original_id_type(g_)) {
-    //   LOG(INFO) << "Invalid oid type" << GRIN_DATATYPE_ENUM<oid_t>::value << " " << grin_get_vertex_original_id_type(g_);
-    //   return false;
-    // }
     auto grin_v = grin_get_vertex_by_original_id_of_int64(g_, oid);
     if (grin_v == GRIN_NULL_VERTEX) {
       return false;
@@ -897,10 +892,6 @@ class GRINFlattenedFragment {
   }
 
   bool GetInnerVertex(oid_t& oid, vertex_t& v) const {
-    // if (GRIN_DATATYPE_ENUM<oid_t>::value != grin_get_vertex_original_id_type(g_)) {
-    //   LOG(INFO) << "Invalid oid type" << GRIN_DATATYPE_ENUM<oid_t>::value << " " << grin_get_vertex_original_id_type(g_);
-    //   return false;
-    // }
     auto grin_v = grin_get_vertex_by_original_id_of_int64(g_, oid);
     if (grin_v == GRIN_NULL_VERTEX || grin_is_mirror_vertex(g_, grin_v)) {
       grin_destroy_vertex(g_, grin_v);
@@ -1002,7 +993,12 @@ class GRINFlattenedFragment {
   inline size_t GetVerticesNum() const { return tvnum_; }
 
   inline size_t GetEdgeNum() const {
-    return grin_get_edge_num(g_);
+#ifdef GRIN_WITH_EDGE_PROPERTY
+    auto et = grin_get_edge_type_from_list(g_, etl_, 0);
+    return grin_get_edge_num_by_type(g_, et);
+#else
+    return grin_get_edge_num(g_, );
+#endif
   }
 
   inline bool IsInnerVertex(const vertex_t& v) const {
@@ -1016,13 +1012,10 @@ class GRINFlattenedFragment {
   }
 
   inline adj_list_t GetOutgoingAdjList(const vertex_t& v) const {
-    // auto al = grin_get_adjacent_list(g_, GRIN_DIRECTION::OUT, v.grin_v);
-    // LOG(INFO) << "Frag-" << grin_get_partition_id(pg_, partition_) << " v.grin_v: " << v.grin_v << " v2oadj_ size=" << v2oadj_.size() << " ivnum_=" << ivnum_;
     auto al = v2oadj_.at(v.grin_v);
 
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     auto sz = grin_get_adjacent_list_size(g_, al);
-    // return adj_list_t(g_, al, e_prop_.c_str(), 0, sz);
     return adj_list_t(g_, al, e_prop_.c_str(), 0, sz);
 #else
     return adj_list_t(g_, al, e_prop_.c_str());
@@ -1030,7 +1023,6 @@ class GRINFlattenedFragment {
   }
 
   inline adj_list_t GetIncomingAdjList(const vertex_t& v) const {
-    // auto al = grin_get_adjacent_list(g_, GRIN_DIRECTION::IN, v.grin_v);
     auto al = v2iadj_.at(v.grin_v);
 
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
@@ -1273,10 +1265,12 @@ class GRINFlattenedFragment {
   std::vector<fid_t> idst_, odst_, iodst_;
   std::vector<fid_t*> idoffset_, odoffset_,
       iodoffset_;
+  GRIN_EDGE_TYPE_LIST etl_;
   std::unordered_map<GRIN_VERTEX, GRIN_ADJACENT_LIST> v2iadj_;
   std::unordered_map<GRIN_VERTEX, GRIN_ADJACENT_LIST> v2oadj_;
 
   GRIN_VERTEX_LIST ivl_, ovl_, tvl_;
+  GRIN_VERTEX_TYPE_LIST vtl_;
   std::shared_ptr<v2index_t> iv2i_;
   std::shared_ptr<v2index_t> ov2i_;
   std::shared_ptr<v2index_t> tv2i_;
