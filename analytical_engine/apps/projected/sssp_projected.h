@@ -31,13 +31,13 @@
 namespace gs {
 
 template <typename FRAG_T>
-class SSSPProjectedContext : public grape::VertexDataContext<FRAG_T, double> {
+class SSSPProjectedContext : public grape::VertexDataContext<FRAG_T, int64_t> {
   using vid_t = typename FRAG_T::vid_t;
   using oid_t = typename FRAG_T::oid_t;
 
  public:
   explicit SSSPProjectedContext(const FRAG_T& fragment)
-      : grape::VertexDataContext<FRAG_T, double>(fragment, true),
+      : grape::VertexDataContext<FRAG_T, int64_t>(fragment, true),
         partial_result(this->data()) {}
 
   void Init(grape::DefaultMessageManager& messages, oid_t source_id_) {
@@ -45,7 +45,7 @@ class SSSPProjectedContext : public grape::VertexDataContext<FRAG_T, double> {
     auto vertices = frag.Vertices();
 
     source_id = source_id_;
-    partial_result.SetValue(std::numeric_limits<double>::max());
+    partial_result.SetValue(std::numeric_limits<int64_t>::max());
     modified.Init(vertices, false);
   }
 
@@ -58,7 +58,7 @@ class SSSPProjectedContext : public grape::VertexDataContext<FRAG_T, double> {
     }
   }
 
-  typename FRAG_T::template vertex_array_t<double>& partial_result;
+  typename FRAG_T::template vertex_array_t<int64_t>& partial_result;
   typename FRAG_T::template vertex_array_t<bool> modified;
   oid_t source_id;
 };
@@ -75,10 +75,10 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
  private:
   // sequential Dijkstra algorithm for SSSP.
   void Dijkstra(const fragment_t& frag, context_t& ctx,
-                std::priority_queue<std::pair<double, vertex_t>>& heap) {
+                std::priority_queue<std::pair<int64_t, vertex_t>>& heap) {
     // auto inner_vertices = frag.InnerVertices();
 
-    double distu, distv, ndistv;
+    int64_t distu, distv, ndistv;
 
     while (!heap.empty()) {
       auto u = heap.top().second;
@@ -94,10 +94,10 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
       for (const auto& e : es) {
         auto v = e.get_neighbor();
         distv = ctx.partial_result[v];
-        double edata = 1.0;
+        int64_t edata = 1.0;
         vineyard::static_if<!std::is_same<edata_t, grape::EmptyType>{}>(
             [&](auto& e, auto& data) {
-              data = static_cast<double>(e.get_data());
+              data = static_cast<int64_t>(e.get_data());
             })(e, edata);
         ndistv = distu + edata;
         if (distv > ndistv) {
@@ -119,7 +119,7 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
     vertex_t source;
     bool native_source = frag.GetInnerVertex(ctx.source_id, source);
 
-    std::priority_queue<std::pair<double, vertex_t>> heap;
+    std::priority_queue<std::pair<int64_t, vertex_t>> heap;
 
     if (native_source) {
       ctx.partial_result[source] = 0.0;
@@ -131,7 +131,7 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
     auto outer_vertices = frag.OuterVertices();
     for (const auto& v : outer_vertices) {
       if (ctx.modified[v]) {
-        messages.SyncStateOnOuterVertex<FRAG_T, double>(frag, v,
+        messages.SyncStateOnOuterVertex<FRAG_T, int64_t>(frag, v,
                                                         ctx.partial_result[v]);
       }
     }
@@ -144,12 +144,12 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
     LOG_IF(INFO, frag.fid() == 0) << "IncEval";
     auto inner_vertices = frag.InnerVertices();
 
-    std::priority_queue<std::pair<double, vertex_t>> heap;
+    std::priority_queue<std::pair<int64_t, vertex_t>> heap;
 
     {
       vertex_t v(0);
-      double val;
-      while (messages.GetMessage<fragment_t, double>(frag, v, val)) {
+      int64_t val;
+      while (messages.GetMessage<fragment_t, int64_t>(frag, v, val)) {
         if (val < ctx.partial_result[v]) {
           ctx.partial_result[v] = val;
           ctx.modified[v] = true;
@@ -169,7 +169,7 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
     auto outer_vertices = frag.OuterVertices();
     for (const auto& v : outer_vertices) {
       if (ctx.modified[v]) {
-        messages.SyncStateOnOuterVertex<FRAG_T, double>(frag, v,
+        messages.SyncStateOnOuterVertex<FRAG_T, int64_t>(frag, v,
                                                         ctx.partial_result[v]);
       }
     }

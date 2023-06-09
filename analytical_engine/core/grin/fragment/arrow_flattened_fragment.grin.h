@@ -427,15 +427,19 @@ struct Nbr {
  public:
   Nbr() : g_{GRIN_NULL_GRAPH}, al_(GRIN_NULL_LIST), cur_(0) {}
   Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, size_t cur) : g_(g), al_(al), cur_(cur) {}
-  Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, size_t cur, const char* default_prop_name)
-    : g_{g}, al_(al), cur_(cur), default_prop_name_(default_prop_name) {}
-  Nbr(const Nbr& rhs) : g_(rhs.g_), al_(rhs.al_), cur_(rhs.cur_), default_prop_name_(rhs.default_prop_name_)  {}
+  // Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, size_t cur, const char* default_prop_name)
+  //   : g_{g}, al_(al), cur_(cur), default_prop_name_(default_prop_name) {}
+  Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, size_t cur, GRIN_EDGE_PROPERTY prop)
+    : g_{g}, al_(al), cur_(cur), prop_(prop) {}
+  // Nbr(const Nbr& rhs) : g_(rhs.g_), al_(rhs.al_), cur_(rhs.cur_), default_prop_name_(rhs.default_prop_name_)  {}
+  Nbr(const Nbr& rhs) : g_(rhs.g_), al_(rhs.al_), cur_(rhs.cur_), prop_(rhs.prop_)  {}
 
   Nbr& operator=(const Nbr& rhs) {
     g_ = rhs.g_;
     al_ = rhs.al_;
     cur_ = rhs.cur_;
-    default_prop_name_ = rhs.default_prop_name_;
+    // default_prop_name_ = rhs.default_prop_name_;
+    prop_ = rhs.prop_;
     return *this;
   }
 
@@ -454,11 +458,11 @@ struct Nbr {
 
   T get_data() const {
     auto _e = grin_get_edge_from_adjacent_list(g_, al_, cur_);
-    auto type = grin_get_edge_type(g_, _e);
-    auto prop = grin_get_edge_property_by_name(g_, type, default_prop_name_);
-    auto _value = grin_get_edge_property_value_of_double(g_, _e, prop);
-    grin_destroy_edge_property(g_, prop);
-    grin_destroy_edge_type(g_, type);
+    // auto type = grin_get_edge_type(g_, _e);
+    // auto prop = grin_get_edge_property_by_name(g_, type, default_prop_name_);
+    auto _value = grin_get_edge_property_value_of_int64(g_, _e, prop_);
+    // grin_destroy_edge_property(g_, prop);
+    // grin_destroy_edge_type(g_, type);
     grin_destroy_edge(g_, _e);
     return _value;
   }
@@ -501,8 +505,9 @@ struct Nbr {
   GRIN_GRAPH g_;
   GRIN_ADJACENT_LIST al_;
   size_t cur_;
+  GRIN_EDGE_PROPERTY prop_;
   // const std::vector<GRIN_EDGE_PROPERTY_TABLE>* epts_;
-  const char* default_prop_name_;
+  // const char* default_prop_name_;
 };
 #else
 template <typename T>
@@ -583,9 +588,12 @@ class AdjList {
 
  public:
   AdjList(): g_(GRIN_NULL_GRAPH), adj_list_(GRIN_NULL_LIST), begin_(0), end_(0) {}
+  // AdjList(GRIN_GRAPH g, GRIN_ADJACENT_LIST adj_list,
+  //         const char* prop_name, size_t begin, size_t end)
+  //   : g_{g}, adj_list_(adj_list), prop_name_(prop_name), begin_(begin), end_(end) {}
   AdjList(GRIN_GRAPH g, GRIN_ADJACENT_LIST adj_list,
-          const char* prop_name, size_t begin, size_t end)
-    : g_{g}, adj_list_(adj_list), prop_name_(prop_name), begin_(begin), end_(end) {}
+          GRIN_EDGE_PROPERTY prop, size_t begin, size_t end)
+    : g_{g}, adj_list_(adj_list), prop_(prop), begin_(begin), end_(end) {}
   AdjList(const AdjList&) = delete;  // disable copy constructor
   void operator=(const AdjList&) = delete;  // disable copy assignment
   AdjList(AdjList&& rhs) = delete;  // disable move constructor
@@ -595,11 +603,11 @@ class AdjList {
   }
 
   inline nbr_t begin() const {
-    return nbr_t(g_, adj_list_, begin_, prop_name_);
+    return nbr_t(g_, adj_list_, begin_, prop_);
   }
 
   inline nbr_t end() const {
-    return nbr_t(g_, adj_list_, end_, prop_name_);
+    return nbr_t(g_, adj_list_, end_, prop_);
   }
 
   inline size_t Size() const { return end_ - begin_; }
@@ -613,7 +621,8 @@ class AdjList {
  private:
   GRIN_GRAPH g_;
   GRIN_ADJACENT_LIST adj_list_;
-  const char* prop_name_;
+  // const char* prop_name_;
+  GRIN_EDGE_PROPERTY prop_;
   size_t begin_;
   size_t end_;
 };
@@ -719,11 +728,12 @@ class GRINFlattenedFragment {
     ivnum_ = grin_get_vertex_list_size(g_, ivl_);
     ovnum_ = grin_get_vertex_list_size(g_, ovl_);
 
-    auto et = grin_get_edge_type_from_list(g_, etl_, 0);
+    et_ = grin_get_edge_type_from_list(g_, etl_, 0);
+    eprop_ = grin_get_edge_property_by_name(g_, et_, e_prop_.c_str());
     auto inner_verices = this->InnerVertices();
     for (const auto& v : inner_verices) {
-      v2iadj_[v.grin_v] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v.grin_v, et);
-      v2oadj_[v.grin_v] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v.grin_v, et);
+      v2iadj_[v.grin_v] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v.grin_v, et_);
+      v2oadj_[v.grin_v] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v.grin_v, et_);
     }
 #elif defined(GRIN_ENABLE_VERTEX_LIST_ITERATOR)
     auto iter = grin_get_vertex_list_begin(g_, tvl_);
@@ -842,6 +852,8 @@ class GRINFlattenedFragment {
     for (const auto& pair : v2oadj_) {
       grin_destroy_adjacent_list(g_, pair.second);
     }
+    grin_destroy_edge_type(g_, et_);
+    grin_destroy_edge_property(g_, eprop_);
     grin_destroy_vertex_type_list(g_, vtl_);
     grin_destroy_edge_type_list(g_, etl_);
     grin_destroy_graph(g_);
@@ -994,8 +1006,7 @@ class GRINFlattenedFragment {
 
   inline size_t GetEdgeNum() const {
 #ifdef GRIN_WITH_EDGE_PROPERTY
-    auto et = grin_get_edge_type_from_list(g_, etl_, 0);
-    return grin_get_edge_num_by_type(g_, et);
+    return grin_get_edge_num_by_type(g_, et_);
 #else
     return grin_get_edge_num(g_, );
 #endif
@@ -1016,7 +1027,7 @@ class GRINFlattenedFragment {
 
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     auto sz = grin_get_adjacent_list_size(g_, al);
-    return adj_list_t(g_, al, e_prop_.c_str(), 0, sz);
+    return adj_list_t(g_, al, eprop_, 0, sz);
 #else
     return adj_list_t(g_, al, e_prop_.c_str());
 #endif
@@ -1030,7 +1041,7 @@ class GRINFlattenedFragment {
     // auto sz =  _al->offsets[_al->etype_end - _al->etype_begin];
     auto sz = grin_get_adjacent_list_size(g_, al);
     // return adj_list_t(g_, al, e_prop_.c_str(), 0, sz);
-    return adj_list_t(g_, al, e_prop_.c_str(), 0, sz);
+    return adj_list_t(g_, al, eprop_, 0, sz);
 #else
     return adj_list_t(g_, al, e_prop_.c_str());
 #endif
@@ -1266,6 +1277,8 @@ class GRINFlattenedFragment {
   std::vector<fid_t*> idoffset_, odoffset_,
       iodoffset_;
   GRIN_EDGE_TYPE_LIST etl_;
+  GRIN_EDGE_TYPE et_;
+  GRIN_EDGE_PROPERTY eprop_;
   std::unordered_map<GRIN_VERTEX, GRIN_ADJACENT_LIST> v2iadj_;
   std::unordered_map<GRIN_VERTEX, GRIN_ADJACENT_LIST> v2oadj_;
 
