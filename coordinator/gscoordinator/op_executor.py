@@ -727,6 +727,7 @@ class OperationExecutor:
                 "\n"
             )
         storage_options = json.loads(op.attr[types_pb2.STORAGE_OPTIONS].s.decode())
+        serialization_options = json.loads(op.attr[types_pb2.SERIALIZATION_OPTIONS].s.decode())
         engine_config = self.get_analytical_engine_config()
         if self._launcher.type() == types_pb2.HOSTS:
             vineyard_endpoint = engine_config["vineyard_rpc_endpoint"]
@@ -743,6 +744,7 @@ class OperationExecutor:
             vineyard_ipc_socket=vineyard_ipc_socket,
             vineyard_endpoint=vineyard_endpoint,
             storage_options=storage_options,
+            serialization_options=serialization_options,
             deployment=deployment,
             hosts=hosts,
         )
@@ -763,6 +765,7 @@ class OperationExecutor:
                 "\n"
             )
         storage_options = json.loads(op.attr[types_pb2.STORAGE_OPTIONS].s.decode())
+        deseralization_options = json.loads(op.attr[types_pb2.DESERIALIZATION_OPTIONS].s.decode())
         engine_config = self.get_analytical_engine_config()
         if self._launcher.type() == types_pb2.HOSTS:
             vineyard_endpoint = engine_config["vineyard_rpc_endpoint"]
@@ -777,6 +780,7 @@ class OperationExecutor:
             vineyard_ipc_socket=vineyard_ipc_socket,
             vineyard_endpoint=vineyard_endpoint,
             storage_options=storage_options,
+            deseralization_options=deseralization_options,
             deployment=deployment,
             hosts=hosts,
         )
