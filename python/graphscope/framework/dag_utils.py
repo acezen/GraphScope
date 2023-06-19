@@ -1052,7 +1052,7 @@ def fetch_gremlin_result(result_set, fetch_type="one"):
     """Fetch the gremlin query result.
 
     Args:
-        result_set (:class:`raphscope.interactive.query.ResultSetDAGNode`):
+        result_set (:class:`graphscope.interactive.query.ResultSetDAGNode`):
             The instance holds the resultSet in coordinator that can fetch the gremlin result from.
         fetch_type (str): "one" or "all". Defaults to "one".
 
@@ -1071,7 +1071,7 @@ def fetch_gremlin_result(result_set, fetch_type="one"):
     return op
 
 
-def archive_graph(graph, path):
+def archive_graph(graph, path: str, **kwargs):
     """Archive a graph to gar format with a path.
 
     Args:
@@ -1086,13 +1086,71 @@ def archive_graph(graph, path):
         types_pb2.OID_TYPE: utils.s_to_attr(graph._oid_type),
         types_pb2.VID_TYPE: utils.s_to_attr("uint64_t"),
         types_pb2.VERTEX_MAP_TYPE: utils.i_to_attr(graph._vertex_map),
+        types_pb2.COMPACT_EDGES: utils.b_to_attr(graph._compact_edges),
+        types_pb2.USE_PERFECT_HASH: utils.b_to_attr(graph._use_perfect_hash),
+        types_pb2.WRITE_OPTIONS: utils.s_to_attr(json.dumps(kwargs)),
+        types_pb2.GRAPH_INFO_PATH: utils.s_to_attr(path),
     }
-    config[types_pb2.GRAPH_INFO_PATH] = utils.s_to_attr(path)
     op = Operation(
         graph.session_id,
         types_pb2.ARCHIVE_GRAPH,
         config=config,
         inputs=[graph.op],
         output_types=types_pb2.NULL_OUTPUT,
+    )
+    return op
+
+
+def serialize_graph(graph, path: str, **kwargs):
+    """Serialize graph to the specified location
+       The meta and data of graph is dumped to specified location,
+       and can be restored by `Graph.load_from` in other sessions.
+
+       Each worker will write a `path_{worker_id}.meta` file and
+       a `path_{worker_id}` file to storage.
+    Args:
+        graph (:class:`graphscope.framework.graph.GraphDAGNode`): Source graph.
+        path (str): The path to serialize the graph, on each worker, supported
+            storages are local, hdfs, oss, s3
+
+    Returns:
+        An op to serialize the graph to a path.
+    """
+    config = {
+        types_pb2.GRAPH_SERIALIZATION_PATH: utils.s_to_attr(path),
+        types_pb2.VINEYARD_ID: utils.i_to_attr(graph._vineyard_id),
+        types_pb2.STORAGE_OPTIONS: utils.s_to_attr(json.dumps(kwargs)),
+    }
+    op = Operation(
+        graph.session_id,
+        types_pb2.SERIALIZE_GRAPH,
+        config=config,
+        inputs=[graph.op],
+        output_types=types_pb2.NULL_OUTPUT,
+    )
+    return op
+
+
+def deserialize_graph(path: str, sess, **kwargs):
+    """Deserialize graph from the specified location.
+
+    Args:
+        path (str): The path contains the serialization files.
+        sess (`graphscope.Session`): The target session
+            that the graph will be construct in.
+
+    Returns:
+        `Graph`: A new graph object. Schema and data is supposed to be
+            identical with the one that called serialized method.
+    """
+    config = {
+        types_pb2.GRAPH_SERIALIZATION_PATH: utils.s_to_attr(path),
+        types_pb2.STORAGE_OPTIONS: utils.s_to_attr(json.dumps(kwargs)),
+    }
+    op = Operation(
+        sess.session_id,
+        types_pb2.DESERIALIZE_GRAPH,
+        config=config,
+        output_types=types_pb2.GRAPH,
     )
     return op

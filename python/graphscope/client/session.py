@@ -1108,16 +1108,13 @@ class Session(object):
         with default_session(self):
             return graphscope.load_from(*args, **kwargs)
 
-    def load_from_gar(self, *args, **kwargs):
-        """Load a graph from gar format files within the session.
-        See more information in :meth:`graphscope.load_from_gar`.
+    @deprecated("Please use `sess.interactive` instead.")
+    def gremlin(self, graph, params=None):
+        """This method is going to be deprecated.
+        Use :meth:`interactive` to get an interactive engine handler supports
+        both gremlin and cypher queries
         """
-        with default_session(self):
-            return graphscope.load_from_gar(*args, **kwargs)
-
-    def _run_on_local(self):
-        self._config_params["port"] = None
-        self._config_params["vineyard_socket"] = ""
+        return self.interactive(graph, params)
 
     def gremlin(self, graph):
         """Get an interactive engine handler to execute gremlin queries.
