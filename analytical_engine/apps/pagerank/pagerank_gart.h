@@ -54,163 +54,193 @@ class PageRankGart
   PageRankGart() {}
   void PEval(const fragment_t& frag, context_t& ctx,
              message_manager_t& messages) {
-    LOG(INFO) << "PEval";
+    // LOG(INFO) << "PEval" << " frag = " << frag.fid() << " thread_num() = " << thread_num();
     auto inner_vertices = frag.InnerVertices();
     auto outer_vertices = frag.OuterVertices();
 
-    Sum(frag.GetInnerVerticesNum(), ctx.graph_vnum);
-    LOG(INFO) << "graph_vnum: " << ctx.graph_vnum;
-    messages.InitChannels(thread_num());
+    if (false) {
+      double start = grape::GetCurrentTime();
+      for (int idx = 0; idx < 100; idx ++) {
+        auto iter = inner_vertices.begin();
+        while (!iter.is_end()) {
+          auto u = *iter;
+          ++iter;
+        }
+      }
+      if (frag.fid() == 0) {
+        LOG(INFO) << "PEval stage prepare vertex Query time: " << grape::GetCurrentTime() - start << " seconds";
+      }
+      return;
+    }
+    
+    if (true) {
+      double start = grape::GetCurrentTime();
+      auto iter = inner_vertices.begin();
+      int total_edge_num = 0;
+      while (!iter.is_end()) {
+        auto u = *iter;
+          auto es = frag.GetOutgoingAdjList(u);
+          auto e_iter = es.begin();
+          
+          while (!e_iter.is_end()) {
+            auto dst = e_iter.get_neighbor();
+            ctx.result_next[dst] = 1;
+            total_edge_num++;
+            ++e_iter;
+          }
+          
+        ++iter;
+      }
+      if (frag.fid() == 0) {
+        LOG(INFO) << "PEval stage prepare Query time: " << grape::GetCurrentTime() - start << " seconds";
+      }
+      std::cout << "total_edge_num = " << total_edge_num << " fid = " << frag.fid() << std::endl;
+      return;
+    }
+    messages.InitChannels(1);
+    
+    int local_vertex_num = 0;
+    local_vertex_num = frag.GetInnerVerticesNum();
+    //std::cout << " local_vertex_num = " << local_vertex_num 
+    //          << " fid = " << frag.fid() << std::endl;
 
-    ctx.step = 0;
-    double p = 1.0 / ctx.graph_vnum;
+    Sum(local_vertex_num, ctx.total_vertex_num);
+    std::cout << "graph_vnum: " << ctx.total_vertex_num << std::endl;
 
-    // assign initial ranks
+    double p = 1.0 / ctx.total_vertex_num; 
+    int dangling_vnum = 0;
+
     {
+      double start = grape::GetCurrentTime();
       auto iter = inner_vertices.begin();
       while (!iter.is_end()) {
         auto u = *iter;
-        ctx.pre_result[u] = p;
-        ctx.degree[u] =
-            static_cast<double>(frag.GetLocalOutDegree(u));
-        if (ctx.degree[u] != 0.0) {
-          ctx.pre_result[u] = ctx.result[u] / ctx.degree[u];
-
-        // messages.SendMsgThroughIEdges<fragment_t, double>(
-        //     frag, u, ctx.result[u] / ctx.degree[u]);
+        ctx.degree[u] = frag.GetLocalOutDegree(u);
+        ctx.result[u] = p;
+        ++iter;
+      }
+      if (frag.fid() == 0) {
+        LOG(INFO) << "PEval stage 0 Query time: " << grape::GetCurrentTime() - start << " seconds";
+      }
+    }
+    {
+      double start = grape::GetCurrentTime();
+      auto iter = inner_vertices.begin();
+      while (!iter.is_end()) {
+        auto u = *iter;
+        int edge_num = ctx.degree[u];
+        if (edge_num > 0) {
+          auto es = frag.GetOutgoingAdjList(u);
+          auto e_iter = es.begin();
+          while (!e_iter.is_end()) {
+            auto dst = e_iter.get_neighbor();
+            ctx.result_next[dst] += p / edge_num;
+            ++e_iter;
+          }
         } else {
-          ++ctx.dangling_vnum;
+          dangling_vnum++;
         }
         ++iter;
       }
-    }
-
-    {
-      auto iter = inner_vertices.begin();
-      while (!iter.is_end()) {
-        auto u = *iter;
-        auto es = frag.GetOutgoingAdjList(u);
-        auto e_iter = es.begin();
-        while (!e_iter.is_end()) {
-          ctx.result[e_iter.get_neighbor()] += ctx.pre_result[u];
-          ++e_iter;
-        }
-        ++iter;
+      if (frag.fid() == 0) {
+        LOG(INFO) << "PEval stage 1 Query time: " << grape::GetCurrentTime() - start << " seconds";
       }
     }
+    Sum(dangling_vnum, ctx.total_dangling_vnum);
+    ctx.dangling_sum = p * ctx.total_dangling_vnum;
     {
+      double start = grape::GetCurrentTime();
       auto iter = outer_vertices.begin();
       while (!iter.is_end()) {
         auto u = *iter;
-        messages.SyncStateOnOuterVertex(frag, u, ctx.result[u]);
+        //std::cout << "vertex = " << " fid = " << frag.fid() << std::endl;
+        messages.SyncStateOnOuterVertex(frag, u, ctx.result_next[u]);
+        ctx.result_next[u] = 0.0;
         ++iter;
       }
+      if (frag.fid() == 0) {
+        LOG(INFO) << "PEval stage 2 Query time: " << grape::GetCurrentTime() - start << " seconds";
+      }
+
     }
-
-    double dangling_sum =
-        ctx.alpha * p * static_cast<double>(ctx.dangling_vnum);
-
-    Sum(dangling_sum, ctx.dangling_sum);
-
+    //return;
     messages.ForceContinue();
   }
 
   void IncEval(const fragment_t& frag, context_t& ctx,
                message_manager_t& messages) {
     LOG(INFO) << "IncEval";
+    double start = grape::GetCurrentTime();
     auto inner_vertices = frag.InnerVertices();
     auto outer_vertices = frag.OuterVertices();
 
-    double dangling_sum = ctx.dangling_sum;
+    ctx.current_round++;
 
-    ++ctx.step;
+    double base = (1.0 - ctx.delta) / ctx.total_vertex_num +
+                  ctx.delta * ctx.dangling_sum / ctx.total_vertex_num;
+    ctx.dangling_sum = base * ctx.total_dangling_vnum;
+
     // process received ranks sent by other workers
     {
       messages.ParallelProcess<fragment_t, double>(
           thread_num(), frag, [&ctx](int tid, const vertex_t& u, const double& msg) {
-            ctx.result[u] += msg;
+            ctx.result_next[u] += msg;
           });
     }
 
-    {
+    if (ctx.current_round == ctx.max_round) {
       auto iter = inner_vertices.begin();
       while (!iter.is_end()) {
         auto u = *iter;
-        ctx.pre_result[u] = ctx.result[u];
+        ctx.result[u] =
+              base + ctx.delta * ctx.result_next[u];
         ++iter;
       }
-    }
-
-    {
-      double base = (1.0 - ctx.alpha) / ctx.graph_vnum + dangling_sum / ctx.graph_vnum;
-      auto iter = inner_vertices.begin();
-      while (!iter.is_end()) {
-        auto u = *iter;
-        ctx.result[u] = ctx.result[u] * ctx.alpha + base;
-        ++iter;
+    } else {
+      {
+        auto iter = inner_vertices.begin();
+        while (!iter.is_end()) {
+          auto u = *iter;
+          ctx.result[u] =
+                base + ctx.delta * ctx.result_next[u];
+          ctx.result_next[u] = 0.0;
+          ++iter;
+        }
+      } 
+      {
+        auto iter = inner_vertices.begin();
+         while (!iter.is_end()) {
+          auto src = *iter;
+          int edge_num = ctx.degree[src];
+          if (edge_num > 0) {
+            double msg = ctx.result[src] / edge_num;
+            auto es = frag.GetOutgoingAdjList(src);
+            auto e_iter = es.begin();
+            while (!e_iter.is_end()) {
+              auto dst = e_iter.get_neighbor();
+              ctx.result_next[dst] += msg;
+              ++e_iter;
+            }
+          }
+          ++iter;
+         }
       }
-    }
-
-    {
-      double eps = 0.0;
-      ctx.dangling_sum = 0.0;
-      auto iter = inner_vertices.begin();
-    while (!iter.is_end()) {
-      auto u = *iter;
-      if (ctx.degree[u] > 0.0) {
-        eps += fabs(ctx.result[u] - ctx.pre_result[u] * ctx.degree[u]);
-      } else {
-        eps += fabs(ctx.result[u] - ctx.pre_result[u]);
-        ctx.dangling_sum += ctx.result[u];
+      {
+        auto iter = outer_vertices.begin();
+        while (!iter.is_end()) {
+          auto u = *iter;
+          messages.SyncStateOnOuterVertex(frag, u, ctx.result_next[u]);
+          ctx.result_next[u] = 0.0;
+          ++iter;
+        }
       }
-      ++iter;
-    }
-
-    double total_eps = 0.0;
-    Sum(eps, total_eps);
-    if (total_eps < ctx.tolerance * ctx.graph_vnum || ctx.step > ctx.max_round) {
-      return;
-    }
-    }
-
-    {
-    auto iter = inner_vertices.begin();
-    while (!iter.is_end()) {
-      auto u = *iter;
-      ctx.pre_result[u] = ctx.result[u] / ctx.degree[u];
-      ++iter;
-    }
-    }
-
-    ctx.result.SetValue(0.0);
-
-    {
-    auto iter = inner_vertices.begin();
-    while (!iter.is_end()) {
-      auto u = *iter;
-      auto es = frag.GetOutgoingAdjList(u);
-      auto e_iter = es.begin();
-      while (!e_iter.is_end()) {
-        ctx.result[e_iter.get_neighbor()] += ctx.pre_result[u];
-        ++e_iter;
+      if (frag.fid() == 0) {
+        LOG(INFO) << "IncEval Query time: " << grape::GetCurrentTime() - start << " seconds";
       }
-      ++iter;
-    }
+
     }
 
-    {
-    auto iter = outer_vertices.begin();
-    while (!iter.is_end()) {
-      auto u = *iter;
-      messages.SyncStateOnOuterVertex(frag, u, ctx.result[u]);
-      ++iter;
-    }
-    }
-
-    double new_dangling = ctx.alpha * static_cast<double>(ctx.dangling_sum);
-    Sum(new_dangling, ctx.dangling_sum);
-
-    messages.ForceContinue();
+   
   }
 };
 

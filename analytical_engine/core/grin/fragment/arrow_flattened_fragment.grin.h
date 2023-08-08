@@ -25,24 +25,25 @@
 #include <vector>
 
 #include "core/object/app_entry.h"
+#include "grin/predefine.h"
+// #include "/root/grin/GART/interfaces/grin/predefine.h"
 extern "C" {
-#include "graph/grin/predefine.h"
-#include "grin/include/topology/structure.h"
-#include "grin/include/topology/vertexlist.h"
-#include "grin/include/topology/adjacentlist.h"
+#include "grin/include/include/topology/structure.h"
+#include "grin/include/include/topology/vertexlist.h"
+#include "grin/include/include/topology/adjacentlist.h"
 
-#include "grin/include/partition/partition.h"
-#include "grin/include/partition/topology.h"
-#include "grin/include/property/topology.h"
-#include "grin/include/partition/reference.h"
+#include "grin/include/include/partition/partition.h"
+#include "grin/include/include/partition/topology.h"
+#include "grin/include/include/property/topology.h"
+#include "grin/include/include/partition/reference.h"
 
-#include "grin/include/property/type.h"
-#include "grin/include/property/property.h"
-#include "grin/include/property/propertylist.h"
-#include "grin/include/property/topology.h"
+#include "grin/include/include/property/type.h"
+#include "grin/include/include/property/property.h"
+#include "grin/include/include/property/propertylist.h"
+#include "grin/include/include/property/topology.h"
 
-#include "grin/include/index/order.h"
-#include "grin/include/index/original_id.h"
+#include "grin/include/include/index/order.h"
+#include "grin/include/include/index/internal_id.h"
 }
 
 namespace grape {
@@ -202,9 +203,9 @@ class VertexRange {
   size_t end_;
 };
 #else
-class VertexRange {
+class VertexRange { // TODO(wanglei): add vtype as member
  public:
-  VertexRange() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_LIST), size_(0), v2idx_(nullptr) {}
+  VertexRange() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), size_(0), v2idx_(nullptr) {}
   VertexRange(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, const std::unordered_map<GRIN_VERTEX, size_t>* v2idx)
       : g_(g), vl_(vl), size_(v2idx->size()), v2idx_(v2idx) {}
 
@@ -228,14 +229,14 @@ class VertexRange {
     GRIN_VERTEX_LIST_ITERATOR cur_;
 
    public:
-    iterator() noexcept : g_(GRIN_NULL_GRAPH), cur_(GRIN_NULL_LIST_ITERATOR) {}
+    iterator() noexcept : g_(GRIN_NULL_GRAPH), cur_(GRIN_NULL_VERTEX_LIST_ITERATOR) {}
     explicit iterator(GRIN_GRAPH g, GRIN_VERTEX_LIST_ITERATOR iter) noexcept : g_(g), cur_(iter) {}
     iterator(const iterator& rhs) = delete;
     iterator& operator=(const iterator& rhs) = delete;
     iterator& operator=(iterator&& rhs) {
       g_ = rhs.g_;
       cur_ = rhs.cur_;
-      rhs.cur_ = GRIN_NULL_LIST_ITERATOR;
+      rhs.cur_ = GRIN_NULL_VERTEX_LIST_ITERATOR;
       return *this;
     }
     ~iterator() {
@@ -258,7 +259,10 @@ class VertexRange {
 
   bool IsEnd(const iterator& iter) const { return iter.is_end(); }
 
-  size_t size() const { return size_; }
+  size_t size() const { 
+    return grin_get_vertex_internal_id_upper_bound_by_type(g_, 0) - grin_get_vertex_internal_id_lower_bound_by_type(g_, 0);
+    // return size_; 
+  }
 
   void Swap(VertexRange& rhs) {
     std::swap(vl_, rhs.vl_);
@@ -271,7 +275,12 @@ class VertexRange {
   const size_t end_value() const { return size_; }
 
   const size_t GetVertexLoc(const Vertex& v) const {
-    return v2idx_->at(v.grin_v);
+    //if (grin_get_vertex_internal_id_by_type(g_, 0, v.grin_v) == v2idx_->at(v.grin_v)) {
+    //  std::cout << "error " << grin_get_vertex_internal_id_by_type(g_, 0, v.grin_v) << " " << v2idx_->at(v.grin_v)<< std::endl;
+    //}
+    return grin_get_vertex_internal_id_by_type(g_, 0, v.grin_v);
+    //return grin_get_position_of_vertex_from_sorted_list(g_, vl_, v.grin_v);
+    //return v2idx_->at(v.grin_v);
   }
 
  private:
@@ -508,7 +517,7 @@ struct Nbr {
 template <typename T>
 struct Nbr {
  public:
-  Nbr() : g_(GRIN_NULL_GRAPH), al_(GRIN_NULL_LIST), cur_(GRIN_NULL_LIST_ITERATOR) {}
+  Nbr() : g_(GRIN_NULL_GRAPH), al_(GRIN_NULL_ADJACENT_LIST), cur_(GRIN_NULL_ADJACENT_LIST_ITERATOR) {}
   Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, GRIN_ADJACENT_LIST_ITERATOR cur, const char* default_prop_name)
     : g_{g}, al_(al), cur_(cur), default_prop_name_(default_prop_name) {}
   Nbr(const Nbr& rhs) = delete;
@@ -517,7 +526,7 @@ struct Nbr {
     al_ = rhs.al_;
     cur_ = rhs.cur_;
     default_prop_name_ = rhs.default_prop_name_;
-    rhs.cur_ = GRIN_NULL_LIST_ITERATOR;
+    rhs.cur_ = GRIN_NULL_ADJACENT_LIST_ITERATOR;
   }
   // Nbr(Nbr& rhs) : g_{rhs.g_}, al_(rhs.al_), cur_(rhs.cur_), default_prop_name_(rhs.default_prop_name_)  {}
   ~Nbr() {
@@ -582,7 +591,7 @@ class AdjList {
   using nbr_t = Nbr<T>;
 
  public:
-  AdjList(): g_(GRIN_NULL_GRAPH), adj_list_(GRIN_NULL_LIST), begin_(0), end_(0) {}
+  AdjList(): g_(GRIN_NULL_GRAPH), adj_list_(GRIN_NULL_ADJACENT_LIST), begin_(0), end_(0) {}
   AdjList(GRIN_GRAPH g, GRIN_ADJACENT_LIST adj_list,
           const char* prop_name, size_t begin, size_t end)
     : g_{g}, adj_list_(adj_list), prop_name_(prop_name), begin_(begin), end_(end) {}
@@ -623,7 +632,7 @@ class AdjList {
   using nbr_t = Nbr<T>;
 
  public:
-  AdjList(): g_(GRIN_NULL_GRAPH), adj_list_(GRIN_NULL_LIST) {}
+  AdjList(): g_(GRIN_NULL_GRAPH), adj_list_(GRIN_NULL_ADJACENT_LIST) {}
   AdjList(GRIN_GRAPH g, GRIN_ADJACENT_LIST adj_list, const char* prop_name)
     : g_{g}, adj_list_(adj_list), prop_name_(prop_name) {}
   AdjList(const AdjList&) = delete;  // disable copy constructor
@@ -631,7 +640,7 @@ class AdjList {
   AdjList(AdjList&& rhs) = delete;  // disable move constructor
 
   ~AdjList() {
-    // grin_destroy_adjacent_list(g_, adj_list_);
+    grin_destroy_adjacent_list(g_, adj_list_);
   }
 
   inline nbr_t begin() const {
@@ -881,6 +890,26 @@ class GRINFlattenedFragment {
 #endif
   }
 
+inline oid_t GetId(const vertex_t& v) const { // TODO(wanglei)
+    return v.grin_v;
+    //return grin_get_vertex_original_id_of_int64(g_, v.grin_v);
+}
+
+bool GetVertex(ref_t& ref, vertex_t& v) const {
+    auto v_ref = grin_deserialize_int64_to_vertex_ref(g_, ref);
+    auto grin_v = grin_get_vertex_from_vertex_ref(g_, v_ref);
+    if (grin_v == GRIN_NULL_VERTEX) {
+      grin_destroy_vertex(g_, v_ref);
+      grin_destroy_vertex_ref(g_, v_ref);
+      return false;
+    }
+    v.Refresh(g_, grin_v);
+    if (IsInnerVertex(v)) {
+      return true;
+    }
+    return false;
+  }
+
 #ifdef GRIN_ENABLE_VERTEX_ORIGINAL_ID_OF_INT64
   bool GetVertex(oid_t& oid, vertex_t& v) const {
     auto grin_v = grin_get_vertex_by_original_id_of_int64(g_, oid);
@@ -904,12 +933,14 @@ class GRINFlattenedFragment {
   inline bool GetId(const vertex_t& v, oid_t& oid) const {
     // if (GRIN_DATATYPE_ENUM<oid_t>::value != grin_get_vertex_original_id_datatype(g_)) return false;
     if (v.grin_v == GRIN_NULL_VERTEX) return false;
-    oid = std::move(grin_get_vertex_original_id_of_int64(g_, v.grin_v));
+    oid = v.grin_v;
+    //oid = std::move(grin_get_vertex_original_id_of_int64(g_, v.grin_v));
     return true;
   }
 
   inline oid_t GetId(const vertex_t& v) const {
-    return grin_get_vertex_original_id_of_int64(g_, v.grin_v);
+    return v.grin_v;
+    //return grin_get_vertex_original_id_of_int64(g_, v.grin_v);
   }
 
 /*
@@ -1012,7 +1043,8 @@ class GRINFlattenedFragment {
   }
 
   inline adj_list_t GetOutgoingAdjList(const vertex_t& v) const {
-    auto al = v2oadj_.at(v.grin_v);
+    // auto al = v2oadj_.at(v.grin_v);
+    auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v.grin_v, 0);
 
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     auto sz = grin_get_adjacent_list_size(g_, al);
@@ -1081,8 +1113,8 @@ class GRINFlattenedFragment {
     return grape::DestList(idoffset_[pos],
                            idoffset_[pos + 1]);
 #else
-    auto oid = GetId(v);
-    auto pos = iv2i_->at(oid);
+    // auto oid = GetId(v);
+    auto pos = iv2i_->at(v.grin_v);
     return grape::DestList(idoffset_[pos],
                            idoffset_[pos + 1]);
 #endif
@@ -1094,8 +1126,8 @@ class GRINFlattenedFragment {
     return grape::DestList(odoffset_[pos],
                            odoffset_[pos + 1]);
 #else
-    auto oid = GetId(v);
-    auto pos = iv2i_->at(oid);
+    // auto oid = GetId(v);
+    auto pos = iv2i_->at(v.grin_v);
     return grape::DestList(odoffset_[pos],
                            odoffset_[pos + 1]);
 #endif
@@ -1107,8 +1139,8 @@ class GRINFlattenedFragment {
     return grape::DestList(iodoffset_[pos],
                            iodoffset_[pos + 1]);
 #else
-    auto oid = GetId(v);
-    auto pos = iv2i_->at(oid);
+    // auto oid = GetId(v);
+    auto pos = iv2i_->at(v.grin_v);
     return grape::DestList(iodoffset_[pos],
                            iodoffset_[pos + 1]);
 #endif
