@@ -35,14 +35,14 @@ using FlattenFragmentType =
                               int64_t>;
 
 template <typename FRAG_T>
-std::shared_ptr<FRAG_T> GetFragment(char** argv, const grape::CommSpec& comm_spec) {
+std::shared_ptr<FRAG_T> GetFragment(char* uri, const grape::CommSpec& comm_spec) {
   LOG(FATAL) << "Unimpl";
 }
 
 template<>
-std::shared_ptr<FlattenFragmentType> GetFragment(char** argv, const grape::CommSpec& comm_spec) {
+std::shared_ptr<FlattenFragmentType> GetFragment(char* uri, const grape::CommSpec& comm_spec) {
   LOG(INFO) << "Load As GRIN Fragment";
-  GRIN_PARTITIONED_GRAPH pg = grin_get_partitioned_graph_from_storage(5, &(argv[0]));
+  GRIN_PARTITIONED_GRAPH pg = grin_get_partitioned_graph_from_storage(uri);
   GRIN_PARTITION_LIST local_partitions = grin_get_local_partition_list(pg);
   size_t local_pnum = grin_get_partition_list_size(pg, local_partitions);
   GRIN_PARTITION partition;
@@ -55,8 +55,8 @@ std::shared_ptr<FlattenFragmentType> GetFragment(char** argv, const grape::CommS
     pg, partition, "person_id", "weight");
 }
 
-void Run(char** argv, const grape::CommSpec& comm_spec) {
-  auto frag = GetFragment<FlattenFragmentType>(argv, comm_spec);
+void Run(char* uri, const grape::CommSpec& comm_spec) {
+  auto frag = GetFragment<FlattenFragmentType>(uri, comm_spec);
   LOG(INFO) << "Inner vertex number: " << frag->GetInnerVerticesNum();
   LOG(INFO) << "Edge number: " << frag->GetEdgeNum();
   auto inner_vertices = frag->InnerVertices();
@@ -101,12 +101,16 @@ void RunProjectedPR(std::shared_ptr<FlattenFragmentType> fragment,
   worker->Init(comm_spec, spec);
 
   LOG(INFO) << "Start query.";
-  worker->Query(0.85, 99, 1e-6);
+  double start = grape::GetCurrentTime();
+  worker->Query(0.85, 5);
+  if (fragment->fid() == 0) {
+    LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << " seconds";
+  }
   LOG(INFO) << "End query. fid: " << fragment->fid();
 
   std::ofstream ostream;
-  std::string output_path =
-      grape::GetResultFilename(out_prefix, fragment->fid());
+  std::string output_path = "/root/wanglei/grin_pr_result_frag_"+std::to_string(fragment->fid());
+  //    grape::GetResultFilename(out_prefix, fragment->fid());
 
   ostream.open(output_path);
   worker->Output(ostream);
@@ -144,8 +148,8 @@ void RunProjectedSSSP(std::shared_ptr<FlattenFragmentType> fragment,
   worker->Finalize();
 }
 
-void RunPagerank(char** argv, const grape::CommSpec& comm_spec) {
-  auto frag = GetFragment<FlattenFragmentType>(argv, comm_spec);
+void RunPagerank(char* uri, const grape::CommSpec& comm_spec) {
+  auto frag = GetFragment<FlattenFragmentType>(uri, comm_spec);
   LOG(INFO) << "Start to run pagerank.";
   RunProjectedPR(frag, comm_spec,  "./output_projected_pagerank/");
   // RunProjectedSSSP(frag, comm_spec,  "./output_projected_pagerank/");
@@ -157,6 +161,13 @@ int main(int argc, char** argv) {
     grape::CommSpec comm_spec;
     comm_spec.Init(MPI_COMM_WORLD);
 
+    std::string uri_str = "gart://192.168.0.22:23760?read_epoch=1&total_partition_num=4&local_partition_num=1&start_partition_id="+std::to_string(comm_spec.fid())+"&meta_prefix=gart_meta_";
+
+    char* uri = const_cast<char*>(uri_str.c_str());
+
+    RunPagerank(uri, comm_spec);
+
+    /*
     int read_epoch = 1;
     std::string etcd_endpoint = "http://192.168.0.22:23760";
     std::string meta_prefix = "gart_meta_";
@@ -173,6 +184,7 @@ int main(int argc, char** argv) {
     strcpy(argv[3], std::to_string(read_epoch).c_str());
     strcpy(argv[4], meta_prefix.c_str());
     RunPagerank(argv, comm_spec);
+    */
     // Run(argv, comm_spec);
   }
 

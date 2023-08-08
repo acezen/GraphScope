@@ -14,9 +14,9 @@ endif ()
 project(analytical_engine LANGUAGES C CXX)
 set(PROJECT_VERSION ${GRAPHSCOPE_ANALYTICAL_VERSION})
 
-option(NETWORKX "networkx on?" ON)
-option(BUILD_TESTS "Build unit test" ON)
-option(ENABLE_JAVA_SDK "Build with support for java sdk" ON)
+option(NETWORKX "networkx on?" OFF)
+option(BUILD_TESTS "Build unit test" OFF)
+option(ENABLE_JAVA_SDK "Build with support for java sdk" OFF)
 option(LET_IT_CRASH_ON_EXCEPTION "Disable boost leaf's error handling and let it crash when exception occurs to help debugging" OFF)
 option(BUILD_GRIN "Build unit test" ON)
 
@@ -273,7 +273,7 @@ else()
 endif()
 
 # find vineyard after arrow to avoid duplicate target names
-find_package(vineyard 0.14.8 REQUIRED)
+find_package(vineyard 0.15.0 REQUIRED)
 include_directories(${VINEYARD_INCLUDE_DIRS})
 add_compile_options(-DENABLE_SELECTOR)
 
@@ -333,10 +333,6 @@ target_link_libraries(grape_engine PRIVATE
 
 if (ENABLE_JAVA_SDK)
     target_compile_definitions(grape_engine PUBLIC ENABLE_JAVA_SDK)
-endif()
-
-if (BUILD_VINEYARD_GRAPH_WITH_GAR)
-    target_compile_definitions(grape_engine PRIVATE -DENABLE_GAR)
 endif()
 
 if (LET_IT_CRASH_ON_EXCEPTION)
@@ -425,7 +421,6 @@ if (BUILD_TESTS)
     endmacro()
 
     add_vineyard_app(run_vy_app SRCS test/run_vy_app.cc)
-    add_vineyard_app(run_vy_app_compact SRCS test/run_vy_app_compact.cc)
     add_vineyard_app(run_vy_app_local_vm SRCS test/run_vy_app_local_vm.cc)
 
     add_vineyard_app(run_load_from_stream SRCS test/run_load_from_stream.cc)
@@ -480,7 +475,7 @@ if (BUILD_GRIN)
     message(STATUS "${CMAKE_CURRENT_SOURCE_DIR}" ${${CMAKE_CURRENT_SOURCE_DIR}})
     file(GLOB_RECURSE GRIN_SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}" "grin/*.cc")
     list(REMOVE_ITEM GRIN_SRC_FILES "/root/grin/GraphScope/analytical_engine/grin/src/proto/message.cc")
-    message(STATUS "GRIN_SRC_FILES" ${GRIN_SRC_FILES})
+    message(STATUS "GRIN_SRC_FILES" ${GRIN_SRC_FILES} ${CMAKE_CURRENT_SOURCE_DIR})
 
     find_package(etcd-cpp-api REQUIRED)
     macro(add_grin_vineyard_app target)
@@ -490,8 +485,8 @@ if (BUILD_GRIN)
         cmake_parse_arguments(add_grin_vineyard_app "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
         add_executable(${target} ${add_grin_vineyard_app_SRCS} ${GRIN_SRC_FILES})
         # add_executable(${target} ${add_grin_vineyard_app_SRCS})
-        target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /root/grin_weibin/v6d/modules/graph/thirdparty)
-        # target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /root/grin/GART/interfaces /root/grin/GART /root/grin/GART/vegito/src)
+        # target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /usr/local/include/vineyard/graph)
+        target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /root/grin/GART/interfaces /root/grin/GART /root/grin/GART/vegito/src)
         # target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /Users/weibin/Dev/gart_grin/research/gart /Users/weibin/Dev/gart_grin/research /Users/weibin/Dev/gart_grin/research/gart/vegito/src)
         # target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /home/gsbot/weibin/gart/research/gart /home/gsbot/weibin/gart/research /home/gsbot/weibin/gart/research/gart/vegito/src)
         # target_link_libraries(${target} gs_proto ${LIBGRAPELITE_LIBRARIES} ${VINEYARD_LIBRARIES} ${ETCD_CPP_LIBRARIES})
@@ -507,8 +502,8 @@ if (BUILD_GRIN)
     endmacro()
 
     message(STATUS ${VINEYARD_INCLUDE_DIRS})
-    # add_grin_vineyard_app(run_gart_test SRCS core/grin/test/run_gart_test.cc)
-    add_grin_vineyard_app(run_grin_app SRCS core/grin/test/run_grin_app.cc)
+    add_grin_vineyard_app(run_gart_test SRCS core/grin/test/run_gart_test.cc)
+    # add_grin_vineyard_app(run_grin_app SRCS core/grin/test/run_grin_app.cc)
 endif ()
 
 # Cpplint
