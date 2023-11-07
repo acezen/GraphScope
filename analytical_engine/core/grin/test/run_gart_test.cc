@@ -21,17 +21,18 @@
 
 #include "grape/grape.h"
 #include "grape/util.h"
+#include "boost/leaf/error.hpp"
 
 #include "apps/pagerank/pagerank_gart.h"
 #include "apps/sssp/sssp_gart.h"
 
-#include "core/grin/fragment/arrow_flattened_fragment.grin.h"
+#include "core/grin/fragment/grin_projected_fragment.h"
 // #include "core/fragment/arrow_flattened_fragment.h"
 
 namespace bl = boost::leaf;
 
 using FlattenFragmentType =
-    gs::GRINFlattenedFragment<int64_t, uint64_t, int64_t,
+    gs::GRINProjectedFragment<int64_t, uint64_t, int64_t,
                               int64_t>;
 
 template <typename FRAG_T>
@@ -52,7 +53,7 @@ std::shared_ptr<FlattenFragmentType> GetFragment(char* uri, const grape::CommSpe
     partition = grin_get_partition_from_list(pg, local_partitions, comm_spec.fid() % local_pnum);
   }
   return std::make_shared<FlattenFragmentType>(
-    pg, partition, "person_id", "weight");
+    pg, partition, "", "", "person_id", "weight");
 }
 
 void Run(char* uri, const grape::CommSpec& comm_spec) {
@@ -192,7 +193,7 @@ int main(int argc, char** argv) {
   return 0;
 }
 
-template class gs::GRINFlattenedFragment<int64_t, uint64_t, int64_t,
+template class gs::GRINProjectedFragment<int64_t, uint64_t, int64_t,
                                int64_t>;
 // template class gs::GRINFlattenedFragment<std::string, uint64_t, grape::EmptyType,
 //                                           grape::EmptyType>;

@@ -22,23 +22,26 @@
 #include <utility>
 #include <vector>
 
-#include "grin/predefine.h"
+#include "vineyard/graph/grin/predefine.h"
+// #include "interfaces/grin/predefine.h"
 
-#include "grin/src/topology/structure.h"
-#include "grin/src/topology/vertexlist.h"
-#include "grin/src/topology/adjacentlist.h"
+#include "grin/topology/structure.h"
+#include "grin/topology/vertexlist.h"
+#include "grin/topology/adjacentlist.h"
 
-#include "grin/src/partition/partition.h"
-#include "grin/src/partition/topology.h"
-#include "grin/src/partition/reference.h"
+#include "grin/partition/partition.h"
+#include "grin/partition/topology.h"
+#include "grin/partition/reference.h"
 
-#include "grin/src/property/type.h"
-#include "grin/src/property/property.h"
-#include "grin/src/property/propertylist.h"
-#include "grin/src/property/topology.h"
+#include "grin/property/type.h"
+#include "grin/property/property.h"
+#include "grin/property/propertylist.h"
+#include "grin/property/topology.h"
+#include "grin/property/value.h"
 
-#include "grin/src/index/order.h"
-#include "grin/src/index/internal_id.h"
+#include "grin/index/order.h"
+#include "grin/index/external_id.h"
+#include "grin/index/internal_id.h"
 
 namespace gs {
 
@@ -93,7 +96,7 @@ struct Vertex {
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
 class VertexRange {
  public:
-  VertexRange() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_LIST), begin_(0), end_(0) {}
+  VertexRange() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), begin_(0), end_(0) {}
   VertexRange(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, const size_t begin, const size_t end)
       noexcept : g_(g), vl_(vl), begin_(begin), end_(end) {}
   VertexRange(const VertexRange& r) noexcept : g_(r.g_), vl_(r.vl_), begin_(r.begin_), end_(r.end_) {}
@@ -117,7 +120,7 @@ class VertexRange {
     size_t cur_;
 
    public:
-    iterator() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_LIST), cur_(0) {}
+    iterator() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), cur_(0) {}
     explicit iterator(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, size_t idx) noexcept : g_(g), vl_(vl), cur_(idx) {}
     iterator(const iterator& rhs) = default;
     iterator& operator=(const iterator& rhs) = default;
@@ -182,6 +185,10 @@ class VertexRange {
 
   size_t end_value() const { return end_; }
 
+  int64_t GetVertexLoc(const Vertex& v) const {
+    auto vt = grin_get_vertex_type(g_, v.grin_v);
+    return grin_get_vertex_internal_id_by_type(g_, vt, v.grin_v);
+  }
  public:
   GRIN_GRAPH g_;
   GRIN_VERTEX_LIST vl_;
@@ -245,19 +252,22 @@ class VertexRange { // TODO(wanglei): add vtype as member
   bool IsEnd(const iterator& iter) const { return iter.is_end(); }
 
   size_t size() const { 
-    // return grin_get_vertex_internal_id_upper_bound_by_type(g_, 0) - grin_get_vertex_internal_id_lower_bound_by_type(g_, 0);
     return size_; 
   }
 
   void Swap(VertexRange& rhs) {
     std::swap(vl_, rhs.vl_);
-    std::swap(v2idx_, rhs.v2idx_);
     std::swap(size_, rhs.size_);
   }
 
   const size_t begin_value() const { return 0; }
 
   const size_t end_value() const { return size_; }
+
+  int64_t GetVertexLoc(const Vertex& v) const {
+    auto vt = grin_get_vertex_type(g_, v.grin_v);
+    return grin_get_vertex_internal_id_by_type(g_, vt, v.grin_v);
+  }
 
  private:
   GRIN_GRAPH g_;
@@ -302,7 +312,7 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
                 range.size(), value);
   }
   void SetValue(const Vertex& loc, const T& value) {
-    auto internal_id = grin_get_vertex_internal_id(g_, loc)
+    auto internal_id = range_.GetVertexLoc(loc);
     fake_start_[internal_id] = value;
   }
 
@@ -311,11 +321,11 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
   }
 
   inline T& operator[](const Vertex& loc) {
-    auto internal_id = grin_get_vertex_internal_id(g_, loc)
+    auto internal_id = range_.GetVertexLoc(loc);
     return fake_start_[internal_id];
   }
   inline const T& operator[](const Vertex& loc) const {
-    auto internal_id = grin_get_vertex_internal_id(g_, loc)
+    auto internal_id = range_.GetVertexLoc(loc);
     return fake_start_[internal_id];
   }
 
@@ -412,17 +422,17 @@ class DenseVertexSet {
 template <typename T>
 struct Nbr {
  public:
-  Nbr() : g_{GRIN_NULL_GRAPH}, al_(GRIN_NULL_LIST), cur_(0) {}
+  Nbr() : g_{GRIN_NULL_GRAPH}, al_(GRIN_NULL_ADJACENT_LIST), cur_(0) {}
   Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, size_t cur) : g_(g), al_(al), cur_(cur) {}
-  Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, size_t cur, const char* default_prop_name)
-    : g_{g}, al_(al), cur_(cur), default_prop_name_(default_prop_name) {}
-  Nbr(const Nbr& rhs) : g_(rhs.g_), al_(rhs.al_), cur_(rhs.cur_), default_prop_name_(rhs.default_prop_name_)  {}
+  Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, size_t cur, GRIN_EDGE_PROPERTY prop)
+    : g_{g}, al_(al), cur_(cur), prop_(prop) {}
+  Nbr(const Nbr& rhs) : g_(rhs.g_), al_(rhs.al_), cur_(rhs.cur_), prop_(rhs.prop_)  {}
 
   Nbr& operator=(const Nbr& rhs) {
     g_ = rhs.g_;
     al_ = rhs.al_;
     cur_ = rhs.cur_;
-    default_prop_name_ = rhs.default_prop_name_;
+    prop_ = rhs.prop_;
     return *this;
   }
 
@@ -442,9 +452,8 @@ struct Nbr {
   T get_data() const {
     auto _e = grin_get_edge_from_adjacent_list(g_, al_, cur_);
     auto type = grin_get_edge_type(g_, _e);
-    auto prop = grin_get_edge_property_by_name(g_, type, default_prop_name_);
-    auto _value = grin_get_edge_property_value_of_double(g_, _e, prop);
-    grin_destroy_edge_property(g_, prop);
+    auto _value = grin_get_edge_property_value_of_double(g_, _e, prop_);
+    grin_destroy_edge_property(g_, prop_);
     grin_destroy_edge_type(g_, type);
     grin_destroy_edge(g_, _e);
     return _value;
@@ -471,14 +480,14 @@ struct Nbr {
   }
 
   inline bool operator==(const Nbr& rhs) const {
-    return al_ == rhs.al_ && cur_ == rhs.cur_;
+    return cur_ == rhs.cur_;
   }
   inline bool operator!=(const Nbr& rhs) const {
-    return al_ != rhs.al_ || cur_ != rhs.cur_;
+    return cur_ != rhs.cur_;
   }
 
   inline bool operator<(const Nbr& rhs) const {
-    return al_ == rhs.al_ && cur_ < rhs.cur_;
+    return cur_ < rhs.cur_;
   }
 
   inline const Nbr& operator*() const { return *this; }
@@ -488,7 +497,7 @@ struct Nbr {
   GRIN_GRAPH g_;
   GRIN_ADJACENT_LIST al_;
   size_t cur_;
-  const char* default_prop_name_;
+  GRIN_EDGE_PROPERTY prop_;
 };
 #else
 template <typename T>
@@ -538,10 +547,13 @@ struct Nbr {
   }
 
   T get_data() const {
+    /*
     auto _e = grin_get_edge_from_adjacent_list_iter(g_, cur_);
     auto type = grin_get_edge_type(g_, _e);
     auto prop = grin_get_edge_property_by_name(g_, type, default_prop_name_);
     return grin_get_edge_property_value_of_double(g_, _e, prop);
+    */
+    return 0;
   }
 
   inline Nbr& operator++() {
@@ -568,10 +580,10 @@ class AdjList {
   using nbr_t = Nbr<T>;
 
  public:
-  AdjList(): g_(GRIN_NULL_GRAPH), adj_list_(GRIN_NULL_ADJACENT_LIST), begin_(0), end_(0) {}
+  AdjList(): g_(GRIN_NULL_GRAPH), adj_list_(GRIN_NULL_ADJACENT_LIST), ep_(GRIN_NULL_EDGE_PROPERTY), begin_(0), end_(0) {}
   AdjList(GRIN_GRAPH g, GRIN_ADJACENT_LIST adj_list,
-          const char* prop_name, size_t begin, size_t end)
-    : g_{g}, adj_list_(adj_list), prop_name_(prop_name), begin_(begin), end_(end) {}
+          GRIN_EDGE_PROPERTY property, size_t begin, size_t end)
+    : g_{g}, adj_list_(adj_list), ep_(property), begin_(begin), end_(end) {}
   AdjList(const AdjList&) = delete;  // disable copy constructor
   void operator=(const AdjList&) = delete;  // disable copy assignment
   AdjList(AdjList&& rhs) = delete;  // disable move constructor
@@ -581,11 +593,11 @@ class AdjList {
   }
 
   inline nbr_t begin() const {
-    return nbr_t(g_, adj_list_, begin_, prop_name_);
+    return nbr_t(g_, adj_list_, begin_, ep_);
   }
 
   inline nbr_t end() const {
-    return nbr_t(g_, adj_list_, end_, prop_name_);
+    return nbr_t(g_, adj_list_, end_, ep_);
   }
 
   inline size_t Size() const { return end_ - begin_; }
@@ -599,7 +611,7 @@ class AdjList {
  private:
   GRIN_GRAPH g_;
   GRIN_ADJACENT_LIST adj_list_;
-  const char* prop_name_;
+  GRIN_EDGE_PROPERTY ep_;
   size_t begin_;
   size_t end_;
 };

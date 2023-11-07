@@ -76,8 +76,6 @@ class GRINFlattenedFragment {
   template <typename DATA_T>
   using outer_vertex_array_t = grin_util::VertexArray<DATA_T>;
 
-  using v2index_t = std::unordered_map<inner_vertices_t, size_t>;
-
   // This member is used by grape::check_load_strategy_compatible()
   static constexpr grape::LoadStrategy load_strategy =
       grape::LoadStrategy::kBothOutIn;
@@ -103,34 +101,18 @@ class GRINFlattenedFragment {
     ovnum_ = grin_get_vertex_list_size(g_, ovl_);
 
     auto et = grin_get_edge_type_from_list(g_, etl_, 0);
-    auto inner_verices = this->InnerVertices();
-    for (const auto& v : inner_verices) {
+    auto inner_vertices = this->InnerVertices();
+    for (const auto& v : inner_vertices) {
       auto internal_id = grin_get_vertex_internal_id(g_, v.grin_v);
       v2iadj_[internal_id] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v.grin_v, et);
       v2oadj_[internal_id] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v.grin_v, et);
     }
 #elif defined(GRIN_ENABLE_VERTEX_LIST_ITERATOR)
-    auto iter = grin_get_vertex_list_begin(g_, tvl_);
-    tv2i_ = std::make_shared<v2index_t>();
-    size_t index = 0;
-    while (!grin_is_vertex_list_end(g_, iter)) {
-      auto v = grin_get_vertex_from_iter(g_, iter);
-      auto internal_id = grin_get_vertex_internal_id(g_, v);
-      (*tv2i_)[internal_id] = index;
-      ++index;
-      grin_destroy_vertex(g_, v);
-      grin_get_next_vertex_list_iter(g_, iter);
-    }
-    grin_destroy_vertex_list_iter(g_, iter);
-    index = 0;
     auto iv_iter = grin_get_vertex_list_begin(g_, ivl_);
-    iv2i_ = std::make_shared<v2index_t>();
     auto et = grin_get_edge_type_from_list(g_, etl_, 0);
     while (!grin_is_vertex_list_end(g_, iv_iter)) {
         auto v = grin_get_vertex_from_iter(g_, iv_iter);
         auto internal_id = grin_get_vertex_internal_id(g_, v);
-        (*iv2i_)[internal_id] = index;
-        ++index;
         ++ivnum_;
         v2iadj_[internal_id] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v, et);
         v2oadj_[internal_id] = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v, et);
@@ -138,16 +120,8 @@ class GRINFlattenedFragment {
         grin_get_next_vertex_list_iter(g_, iv_iter);
     }
     grin_destroy_vertex_list_iter(g_, iv_iter);
-    auto ov_iter = grin_get_vertex_list_begin(g_, ovl_);
-    ov2i_ = std::make_shared<v2index_t>();
-    index = 0;
     while (!grin_is_vertex_list_end(g_, ov_iter)) {
-      auto v = grin_get_vertex_from_iter(g_, ov_iter);
-      auto internal_id = grin_get_vertex_internal_id(g_, v);
-      (*ov2i_)[internal_id] = index;
-      ++index;
       ++ovnum_;
-      grin_destroy_vertex(g_, v);
       grin_get_next_vertex_list_iter(g_, ov_iter);
     }
     grin_destroy_vertex_list_iter(g_, ov_iter);
@@ -218,7 +192,7 @@ class GRINFlattenedFragment {
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     return vertex_range_t(g_, tvl_, 0, tvnum_);
 #else
-    return vertex_range_t(g_, tvl_, tv2i_.get());
+    return vertex_range_t(g_, tvl_, 0);
 #endif
   }
 
@@ -226,7 +200,7 @@ class GRINFlattenedFragment {
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     return vertex_range_t(g_, ivl_, 0, ivnum_);
 #else
-    return vertex_range_t(g_, ivl_, iv2i_.get());
+    return vertex_range_t(g_, ivl_, 0);
 #endif
   }
 
@@ -234,7 +208,7 @@ class GRINFlattenedFragment {
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     return vertex_range_t(g_, ovl_, 0, ovnum_);
 #else
-    return vertex_range_t(g_, ovl_, ov2i_.get());
+    return vertex_range_t(g_, ovl_, 0);
 #endif
   }
 
@@ -653,9 +627,6 @@ bool GetVertex(gid_t& ref, vertex_t& v) const {
 
   GRIN_VERTEX_LIST ivl_, ovl_, tvl_;
   GRIN_VERTEX_TYPE_LIST vtl_;
-  std::shared_ptr<v2index_t> iv2i_;
-  std::shared_ptr<v2index_t> ov2i_;
-  std::shared_ptr<v2index_t> tv2i_;
 
   // std::shared_ptr<std::vector<GRIN_EDGE_PROPERTY_TABLE>> epts_;
 
