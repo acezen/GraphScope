@@ -104,7 +104,7 @@ class GRINProjectedFragment {
       LOG(FATAL) << "Vertex property " << v_prop << " not exist.";
     }
     ep_ = grin_get_edge_property_by_name(g_, et_, e_prop.c_str());
-    if (ep_ == GRIN_NULL_VERTEX_PROPERTY) {
+    if (ep_ == GRIN_NULL_EDGE_PROPERTY) {
       LOG(FATAL) << "Edge property " << e_prop << " not exist.";
     }
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
