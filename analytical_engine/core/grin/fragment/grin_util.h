@@ -424,7 +424,6 @@ template <typename T>
 struct Nbr {
  public:
   Nbr() : g_{GRIN_NULL_GRAPH}, al_(GRIN_NULL_ADJACENT_LIST), cur_(0) {}
-  Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, size_t cur) : g_(g), al_(al), cur_(cur) {}
   Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, size_t cur, GRIN_EDGE_PROPERTY prop)
     : g_{g}, al_(al), cur_(cur), prop_(prop) {}
   Nbr(const Nbr& rhs) : g_(rhs.g_), al_(rhs.al_), cur_(rhs.cur_), prop_(rhs.prop_)  {}

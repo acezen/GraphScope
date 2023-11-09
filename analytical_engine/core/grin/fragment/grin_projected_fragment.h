@@ -100,7 +100,13 @@ class GRINProjectedFragment {
     ivl_ = grin_get_vertex_list_by_type_select_master(g_, vt_);
     ovl_ = grin_get_vertex_list_by_type_select_mirror(g_, vt_);
     vp_ = grin_get_vertex_property_by_name(g_, vt_, v_prop.c_str());
+    if (vp_ == GRIN_NULL_VERTEX_PROPERTY) {
+      LOG(FATAL) << "Vertex property " << v_prop << " not exist.";
+    }
     ep_ = grin_get_edge_property_by_name(g_, et_, e_prop.c_str());
+    if (ep_ == GRIN_NULL_VERTEX_PROPERTY) {
+      LOG(FATAL) << "Edge property " << e_prop << " not exist.";
+    }
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     tvnum_ = grin_get_vertex_list_size(g_, tvl_);
     ivnum_ = grin_get_vertex_list_size(g_, ivl_);
