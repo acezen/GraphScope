@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "vineyard/common/util/static_if.h"
 #include "vineyard/graph/grin/predefine.h"
 // #include "interfaces/grin/predefine.h"
 
@@ -452,7 +453,15 @@ struct Nbr {
   T get_data() const {
     auto _e = grin_get_edge_from_adjacent_list(g_, al_, cur_);
     auto type = grin_get_edge_type(g_, _e);
-    auto _value = grin_get_edge_property_value_of_double(g_, _e, prop_);
+    T _value;
+    vineyard::static_if<std::is_same<T, int64_t>{}>(
+        [&](auto& _value) {
+          _value = grin_get_edge_property_value_of_int64(g_, _e, prop_);
+        })(_value);
+    vineyard::static_if<std::is_same<T, double>{}>(
+        [&](auto& _value) {
+          _value = grin_get_edge_property_value_of_double(g_, _e, prop_);
+        })(_value);
     grin_destroy_edge_property(g_, prop_);
     grin_destroy_edge_type(g_, type);
     grin_destroy_edge(g_, _e);

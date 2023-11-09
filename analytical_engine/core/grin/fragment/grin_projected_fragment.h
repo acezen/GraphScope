@@ -258,7 +258,8 @@ class GRINProjectedFragment {
   inline bool GetInnerVertex(const oid_t& oid, vertex_t& v) const {
     // TODO: may be just get vertex by label index
     auto grin_v = grin_get_vertex_by_external_id_of_int64(g_, oid);
-    if (grin_v == GRIN_NULL_VERTEX) {
+    if (grin_v == GRIN_NULL_VERTEX && !grin_is_master_vertex(g_, grin_v)) {
+      grin_destroy_vertex(g_, grin_v);
       return false;
     }
     v.Refresh(g_, grin_v);
