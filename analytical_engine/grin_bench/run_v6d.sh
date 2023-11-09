@@ -10,7 +10,7 @@ function start_vineyard() {
 
   vineyardd \
     --socket ${socket_file} \
-    --size 21474000 \
+    --size "200G" \
     --etcd_prefix "grin-etcd" \
     --etcd_endpoint=localhost:3460 &
   set +m

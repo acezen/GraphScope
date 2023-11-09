@@ -31,6 +31,7 @@
 #include "apps/centrality/eigenvector/eigenvector_centrality.h"
 
 #include "apps/projected/sssp_projected.h"
+#include "apps/projected/wcc_projected.h"
 
 #include "core/fragment/arrow_flattened_fragment.h"
 #include "core/fragment/arrow_projected_fragment.h"
@@ -44,11 +45,11 @@ using vid_t = vineyard::property_graph_types::VID_TYPE;
 using FragmentType = vineyard::ArrowFragment<oid_t, vid_t>;
 
 using GRINProjectedFragmentType =
-    gs::GRINProjectedFragment<oid_t, vid_t, int64_t,
+    gs::GRINProjectedFragment<oid_t, vid_t, double,
                                int64_t>;
 
 using ProjectedFragmentType =
-    gs::ArrowProjectedFragment<oid_t, vid_t, int64_t,
+    gs::ArrowProjectedFragment<oid_t, vid_t, double,
                                int64_t>;
 template <typename FRAG_T>
 void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
@@ -104,6 +105,39 @@ void RunSSSP(std::shared_ptr<FRAG_T> fragment,
   }
   double start = grape::GetCurrentTime();
   worker->Query(6);
+  if (comm_spec.worker_id() == 0) {
+    LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << "seconds";
+  }
+
+  /*
+  std::ofstream ostream;
+  std::string output_path =
+      grape::GetResultFilename(out_prefix, fragment->fid());
+
+  ostream.open(output_path);
+  worker->Output(ostream);
+  ostream.close();
+  */
+
+  worker->Finalize();
+}
+
+template <typename FRAG_T>
+void RunWCC(std::shared_ptr<FRAG_T> fragment,
+                    const grape::CommSpec& comm_spec,
+                    const std::string& out_prefix) {
+  // using AppType = grape::SSSP<FRAG_T>;
+  using AppType = gs::WCCProjected<FRAG_T>;
+  auto app = std::make_shared<AppType>();
+  auto worker = AppType::CreateWorker(app, fragment);
+  auto spec = grape::DefaultParallelEngineSpec();
+  worker->Init(comm_spec, spec);
+
+  if (comm_spec.worker_id() == 0) {
+    LOG(INFO) << "Start query.";
+  }
+  double start = grape::GetCurrentTime();
+  worker->Query();
   if (comm_spec.worker_id() == 0) {
     LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << "seconds";
   }
@@ -187,6 +221,8 @@ void RunGrin(const grape::CommSpec& comm_spec, int argc, char** argv) {
     RunProjectedEigen<GRINProjectedFragmentType>(frag, comm_spec, "output_eigen");
   } else if (app_name == "sssp") {
     RunSSSP<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_sssp");
+  } else if (app_name == "wcc") {
+    RunWCC<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_wcc");
   } else {
     LOG(FATAL) << "Unknown app name: " << app_name;
   }
@@ -213,6 +249,8 @@ void RunNoGrin(const grape::CommSpec& comm_spec, int argc, char** argv) {
     RunProjectedEigen<ProjectedFragmentType>(frag, comm_spec, "output_eigen");
   } else if (app_name == "sssp") {
     RunSSSP<ProjectedFragmentType>(frag, comm_spec, "/tmp/output_sssp");
+  } else if (app_name == "wcc") {
+    RunWCC<ProjectedFragmentType>(frag, comm_spec, "/tmp/output_wcc"); 
   } else {
     LOG(FATAL) << "Unknown app name: " << app_name;
   }
