@@ -76,7 +76,6 @@ void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
   }
 
 
-  /*
   std::ofstream ostream;
   std::string output_path =
       grape::GetResultFilename(out_prefix, fragment->fid());
@@ -84,7 +83,6 @@ void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
   ostream.open(output_path);
   worker->Output(ostream);
   ostream.close();
-  */
 
   worker->Finalize();
 }
@@ -109,7 +107,6 @@ void RunSSSP(std::shared_ptr<FRAG_T> fragment,
     LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << "seconds";
   }
 
-  /*
   std::ofstream ostream;
   std::string output_path =
       grape::GetResultFilename(out_prefix, fragment->fid());
@@ -117,7 +114,6 @@ void RunSSSP(std::shared_ptr<FRAG_T> fragment,
   ostream.open(output_path);
   worker->Output(ostream);
   ostream.close();
-  */
 
   worker->Finalize();
 }

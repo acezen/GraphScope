@@ -97,16 +97,17 @@ struct Vertex {
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
 class VertexRange {
  public:
-  VertexRange() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), begin_(0), end_(0) {}
-  VertexRange(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, const size_t begin, const size_t end)
-      noexcept : g_(g), vl_(vl), begin_(begin), end_(end) {}
-  VertexRange(const VertexRange& r) noexcept : g_(r.g_), vl_(r.vl_), begin_(r.begin_), end_(r.end_) {}
+  VertexRange() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), vt_(GRIN_NULL_VERTEX_TYPE), begin_(0), end_(0) {}
+  VertexRange(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, GRIN_VERTEX_TYPE vt, const size_t begin, const size_t end)
+      noexcept : g_(g), vl_(vl), vt_(vt), begin_(begin), end_(end) {}
+  VertexRange(const VertexRange& r) noexcept : g_(r.g_), vl_(r.vl_), vt_(r.vt_), begin_(r.begin_), end_(r.end_) {}
 
   ~VertexRange() = default;
 
   inline VertexRange& operator=(const VertexRange& r) noexcept {
     g_ = r.g_;
     vl_ = r.vl_;
+    vt_ = r.vt_;
     begin_ = r.begin_;
     end_ = r.end_;
     return *this;
@@ -173,6 +174,7 @@ class VertexRange {
 
   void Swap(VertexRange& rhs) {
     std::swap(vl_, rhs.vl_);
+    std::swap(vt_, rhs.vt_);
     std::swap(begin_, rhs.begin_);
     std::swap(end_, rhs.end_);
   }
@@ -187,12 +189,12 @@ class VertexRange {
   size_t end_value() const { return end_; }
 
   int64_t GetVertexLoc(const Vertex& v) const {
-    auto vt = grin_get_vertex_type(g_, v.grin_v);
-    return grin_get_vertex_internal_id_by_type(g_, vt, v.grin_v);
+    return grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
   }
  public:
   GRIN_GRAPH g_;
   GRIN_VERTEX_LIST vl_;
+  GRIN_VERTEX_TYPE vt_;
   size_t begin_;
   size_t end_;
 };
