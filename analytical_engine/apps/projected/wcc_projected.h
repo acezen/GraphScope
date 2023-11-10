@@ -175,7 +175,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
     for (auto v : inner_vertices) {
       auto cid = ctx.comp_id[v];
 
-      auto es = frag.GetOutgoingAdjList(v);
+      auto es = frag.WrapGetOutgoingAdjList(v);
       for (auto& e : es) {
         auto u = e.get_neighbor();
         if (ctx.comp_id[u] > cid) {
@@ -184,7 +184,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
         }
       }
 
-      auto es2 = frag.GetIncomingAdjList(v);
+      auto es2 = frag.WrapGetIncomingAdjList(v);
       if (frag.directed()) {
         // es = frag.GetIncomingAdjList(v);
         for (auto& e : es2) {
@@ -245,7 +245,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
       ctx.curr_modified[v] = false;
       auto cid = ctx.comp_id[v];
 
-      auto es = frag.GetOutgoingAdjList(v);
+      auto es = frag.WrapGetOutgoingAdjList(v);
       for (auto& e : es) {
         auto u = e.get_neighbor();
         if (ctx.comp_id[u] > cid) {
@@ -254,7 +254,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
         }
       }
 
-      auto es2 = frag.GetIncomingAdjList(v);
+      auto es2 = frag.WrapGetIncomingAdjList(v);
       if (frag.directed()) {
         // es = frag.GetIncomingAdjList(v);
         for (auto& e : es2) {
