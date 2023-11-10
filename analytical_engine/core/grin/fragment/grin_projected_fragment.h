@@ -86,11 +86,11 @@ class GRINProjectedFragment {
     grin_destroy_vertex_list(g_, tvl_);
     grin_destroy_vertex_list(g_, ivl_);
     grin_destroy_vertex_list(g_, ovl_);
-    for (const auto& pair : v2iadj_) {
-      grin_destroy_adjacent_list(g_, pair.second);
+    for (const auto& al : v2iadj_) {
+      grin_destroy_adjacent_list(g_, al);
     }
-    for (const auto& pair : v2oadj_) {
-      grin_destroy_adjacent_list(g_, pair.second);
+    for (const auto& al : v2oadj_) {
+      grin_destroy_adjacent_list(g_,al);
     }
     /*
     grin_destropy_vertex_type(g_, vt_);
@@ -693,8 +693,8 @@ class GRINProjectedFragment {
 
   GRIN_VERTEX_TYPE vt_;
   GRIN_EDGE_TYPE et_;
-  std::unordered_map<internal_id_t, GRIN_ADJACENT_LIST> v2iadj_;
-  std::unordered_map<internal_id_t, GRIN_ADJACENT_LIST> v2oadj_;
+  std::vector<GRIN_ADJACENT_LIST> v2iadj_;
+  std::vector<GRIN_ADJACENT_LIST> v2oadj_;
 
   GRIN_VERTEX_LIST ivl_, ovl_, tvl_;
 };
