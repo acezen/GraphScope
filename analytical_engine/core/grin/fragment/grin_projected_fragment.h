@@ -128,6 +128,8 @@ class GRINProjectedFragment {
     tvnum_ = grin_get_vertex_list_size(g_, tvl_);
     ivnum_ = grin_get_vertex_list_size(g_, ivl_);
     ovnum_ = grin_get_vertex_list_size(g_, ovl_);
+    v2iadj_.resize(ivnum_);
+    v2oadj_.resize(ivnum_);
 
     for (size_t i = 0; i < ivnum_; ++i) {
       auto v = grin_get_vertex_from_list(g_, ivl_, i);
