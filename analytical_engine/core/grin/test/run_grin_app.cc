@@ -33,8 +33,9 @@
 #include "apps/projected/sssp_projected.h"
 #include "apps/projected/wcc_projected.h"
 
-#include "core/fragment/arrow_flattened_fragment.h"
+// #include "core/fragment/arrow_flattened_fragment.h"
 #include "core/fragment/arrow_projected_fragment.h"
+#include "core/fragment/arrow_simple_fragment.h"
 #include "core/loader/arrow_fragment_loader.h"
 
 namespace bl = boost::leaf;
@@ -50,6 +51,10 @@ using GRINProjectedFragmentType =
 
 using ProjectedFragmentType =
     gs::ArrowProjectedFragment<oid_t, vid_t, double,
+                               int64_t>;
+
+using SimpleFragmentType =
+    gs::ArrowSimpleFragment<oid_t, vid_t, double,
                                int64_t>;
 template <typename FRAG_T>
 void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
@@ -204,6 +209,18 @@ std::shared_ptr<ProjectedFragmentType> GetFragment(const std::string& ipc_socket
   return ProjectedFragmentType::Project(arrow_frag, 0, 0, 0, 0);
 }
 
+std::shared_ptr<SimpleFragmentType> GetSimpleFragment(const std::string& ipc_socket, vineyard::Client& client,
+         const grape::CommSpec& comm_spec,
+         vineyard::ObjectID fragment_group_id) {
+  LOG(INFO) << "Load as ARROW Fragment";
+  auto fg = std::dynamic_pointer_cast<vineyard::ArrowFragmentGroup>(
+      client.GetObject(fragment_group_id));
+  auto fid = comm_spec.WorkerToFrag(comm_spec.worker_id());
+  auto frag_id = fg->Fragments().at(fid);
+  auto arrow_frag = std::static_pointer_cast<FragmentType>(client.GetObject(frag_id));
+  return SimpleFragmentType::Make(arrow_frag, 0, 0, 0, 0);
+}
+
 
 void RunGrin(const grape::CommSpec& comm_spec, int argc, char** argv) {
   int index = 2;
@@ -237,16 +254,16 @@ void RunNoGrin(const grape::CommSpec& comm_spec, int argc, char** argv) {
   vineyard::Client client;
   VINEYARD_CHECK_OK(client.Connect(ipc_socket));
 
-  auto frag = GetFragment(ipc_socket, client, comm_spec, fragment_id);
+  auto frag = GetSimpleFragment(ipc_socket, client, comm_spec, fragment_id);
 
   if (app_name == "pagerank") {
-    RunProjectedPR<ProjectedFragmentType>(frag, comm_spec, "/tmp/output_pr");
+    RunProjectedPR<SimpleFragmentType>(frag, comm_spec, "/tmp/output_pr");
   } else if (app_name == "eigenvector") {
-    RunProjectedEigen<ProjectedFragmentType>(frag, comm_spec, "output_eigen");
+    RunProjectedEigen<SimpleFragmentType>(frag, comm_spec, "output_eigen");
   } else if (app_name == "sssp") {
-    RunSSSP<ProjectedFragmentType>(frag, comm_spec, "/tmp/output_sssp");
+    RunSSSP<SimpleFragmentType>(frag, comm_spec, "/tmp/output_sssp");
   } else if (app_name == "wcc") {
-    RunWCC<ProjectedFragmentType>(frag, comm_spec, "/tmp/output_wcc"); 
+    RunWCC<SimpleFragmentType>(frag, comm_spec, "/tmp/output_wcc"); 
   } else {
     LOG(FATAL) << "Unknown app name: " << app_name;
   }
@@ -358,7 +375,11 @@ template class gs::GRINProjectedFragment<int64_t, uint64_t, int64_t,
                                int64_t>;
 template class gs::ArrowProjectedFragment<int64_t, uint64_t, int64_t,
                                int64_t>;
+template class gs::ArrowSimpleFragment<int64_t, uint64_t, int64_t,
+                               int64_t>;
 template class gs::GRINProjectedFragment<int64_t, uint64_t, double,
                                int64_t>;
 template class gs::ArrowProjectedFragment<int64_t, uint64_t, double,
+                               int64_t>;
+template class gs::ArrowSimpleFragment<int64_t, uint64_t, double,
                                int64_t>;
