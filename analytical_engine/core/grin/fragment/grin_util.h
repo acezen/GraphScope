@@ -320,8 +320,8 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
                 range.size(), value);
   }
   void SetValue(const Vertex& loc, const T& value) {
-    // auto internal_id = range_.GetVertexLoc(loc);
-    fake_start_[loc.grin_v] = value;
+    auto internal_id = range_.GetVertexLoc(loc);
+    fake_start_[internal_id] = value;
   }
 
   void SetValue(const T& value) {
@@ -329,12 +329,12 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
   }
 
   inline T& operator[](const Vertex& loc) {
-    // auto internal_id = range_.GetVertexLoc(loc);
-    return fake_start_[loc.grin_v];
+    auto internal_id = range_.GetVertexLoc(loc);
+    return fake_start_[internal_id];
   }
   inline const T& operator[](const Vertex& loc) const {
-    // auto internal_id = range_.GetVertexLoc(loc);
-    return fake_start_[loc.grin_v];
+    auto internal_id = range_.GetVertexLoc(loc);
+    return fake_start_[internal_id];
   }
 
   void Swap(VertexArray& rhs) {
