@@ -49,12 +49,11 @@ namespace gs {
 namespace grin_util {
 
 // A wrapper for GRIN_VERTEX
-/*
 struct Vertex {
-  Vertex(uint64_t v) noexcept : grin_v(v) {}  // compatible with grape
-  Vertex() noexcept : grin_v(GRIN_NULL_VERTEX) {}
+  Vertex(uint64_t a) noexcept : g_(GRIN_NULL_GRAPH), grin_v(GRIN_NULL_VERTEX) {}  // compatible with grape
+  Vertex() noexcept : g_(GRIN_NULL_GRAPH), grin_v(GRIN_NULL_VERTEX) {}
   explicit Vertex(GRIN_GRAPH g, GRIN_VERTEX v) noexcept : g_(g), grin_v(v) {}
-  Vertex& operator=(Vertex&& rhs) noexcept {
+  inline Vertex& operator=(Vertex&& rhs) noexcept {
     g_ = rhs.g_;
     grin_v = rhs.grin_v;
     rhs.grin_v = GRIN_NULL_VERTEX;
@@ -69,7 +68,7 @@ struct Vertex {
   Vertex(Vertex&& rhs) noexcept : g_(rhs.g_), grin_v(rhs.grin_v) {
     rhs.grin_v = GRIN_NULL_VERTEX;
   }
-  Vertex& operator=(const Vertex& rhs) {
+  inline Vertex& operator=(const Vertex& rhs) {
     g_ = rhs.g_;
     grin_v = GRIN_NULL_VERTEX;
     auto v_ref = grin_get_vertex_ref_by_vertex(g_, rhs.grin_v);
@@ -80,11 +79,11 @@ struct Vertex {
   ~Vertex() {
     grin_destroy_vertex(g_, grin_v);
   }
-  bool operator<(const Vertex& rhs) const {
+  inline bool operator<(const Vertex& rhs) const {
     return grin_v < rhs.grin_v;
   }
 
-  void Refresh(GRIN_GRAPH g, GRIN_VERTEX v) {
+  inline void Refresh(GRIN_GRAPH g, GRIN_VERTEX v) {
     grin_destroy_vertex(g_, grin_v);
     g_ = g;
     grin_v = v;
@@ -92,72 +91,6 @@ struct Vertex {
 
   GRIN_GRAPH g_;
   GRIN_VERTEX grin_v;
-};
-*/
-
-class Vertex {
- public:
-  using T = unsigned long long int;
-
-  Vertex() = default;
-  explicit Vertex(const T& value) noexcept : grin_v(value) {}
-
-  ~Vertex() = default;
-
-  inline Vertex& operator=(const T& value) noexcept {
-    grin_v = value;
-    return *this;
-  }
-
-  inline Vertex& operator++() noexcept {
-    grin_v++;
-    return *this;
-  }
-
-  inline Vertex operator++(int) {
-    Vertex res(grin_v);
-    grin_v++;
-    return res;
-  }
-
-  inline Vertex& operator--() noexcept {
-    grin_v--;
-    return *this;
-  }
-
-  inline Vertex operator--(int) noexcept {
-    Vertex res(grin_v);
-    grin_v--;
-    return res;
-  }
-
-  inline Vertex operator+(size_t offset) const noexcept {
-    Vertex res(grin_v + offset);
-    return res;
-  }
-
-  inline bool operator==(const Vertex& rhs) const {
-    return grin_v == rhs.grin_v;
-  }
-
-  inline bool operator!=(const Vertex& rhs) const {
-    return grin_v != rhs.grin_v;
-  }
-
-  inline bool operator<(const Vertex& rhs) const {
-    return grin_v < rhs.grin_v;
-  }
-
-  inline T GetValue() const { return grin_v; }
-
-  inline void SetValue(T value) { grin_v = value; }
-
-  inline void Refresh(GRIN_GRAPH g, GRIN_VERTEX v) {
-    grin_v = v;
-  }
-
- public:
-  T grin_v{};
 };
 
 
@@ -182,64 +115,11 @@ class VertexRange {
 
   class iterator {
     using reference_type = Vertex&;
-    using T = unsigned long long int;
-
-   private:
-    Vertex cur_;
-
-   public:
-    iterator() noexcept : cur_() {}
-    explicit iterator(const T& v) noexcept : cur_(v) {}
-
-    reference_type operator*() noexcept { return cur_; }
-
-    iterator& operator++() noexcept {
-      ++cur_;
-      return *this;
-    }
-
-    iterator operator++(int) noexcept {
-      iterator ret = *this;
-      ++*this;
-      return ret;
-    }
-
-    iterator& operator--() noexcept {
-      --cur_;
-      return *this;
-    }
-
-    iterator operator--(int) noexcept {
-      iterator ret = *this;
-      --*this;
-      return ret;
-    }
-
-    iterator operator+(size_t offset) const noexcept {
-      return iterator(cur_.GetValue() + offset);
-    }
-
-    bool operator==(const iterator& rhs) const noexcept {
-      return cur_ == rhs.cur_;
-    }
-
-    bool operator!=(const iterator& rhs) const noexcept {
-      return cur_ != rhs.cur_;
-    }
-
-    bool operator<(const iterator& rhs) const noexcept {
-      return cur_.GetValue() < rhs.cur_.GetValue();
-    }
-  };
-
-/*
-  class iterator {
-    using reference_type = Vertex&;
 
    private:
     GRIN_GRAPH g_;
     GRIN_VERTEX_LIST vl_;
-    Vertex cur_;
+    size_t cur_;
 
    public:
     iterator() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), cur_(0) {}
@@ -285,11 +165,10 @@ class VertexRange {
       return vl_ == rhs.vl_ && cur_ < rhs.cur_;
     }
   };
-  */
 
-  iterator begin() const { return iterator(grin_get_vertex_from_list(g_, vl_, begin_)); }
+  iterator begin() const { return iterator(g_, vl_, begin_); }
 
-  iterator end() const { return iterator(grin_get_vertex_from_list(g_, vl_, end_)); }
+  iterator end() const { return iterator(g_, vl_, end_); }
 
   size_t size() const { return end_ - begin_; }
 
@@ -560,13 +439,11 @@ struct Nbr {
   }
 
   Vertex neighbor() const {
-    // return Vertex(g_, grin_get_neighbor_from_adjacent_list(g_, al_, cur_));
-    return Vertex(grin_get_neighbor_from_adjacent_list(g_, al_, cur_));
+    return Vertex(g_, grin_get_neighbor_from_adjacent_list(g_, al_, cur_));
   }
 
   Vertex get_neighbor() const {
-    // return Vertex(g_, grin_get_neighbor_from_adjacent_list(g_, al_, cur_));
-    return Vertex(grin_get_neighbor_from_adjacent_list(g_, al_, cur_));
+    return Vertex(g_, grin_get_neighbor_from_adjacent_list(g_, al_, cur_));
   }
 
   // TODO: add a wrapper like vertex to care the destroy of edge
