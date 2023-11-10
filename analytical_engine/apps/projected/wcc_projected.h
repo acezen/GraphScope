@@ -73,6 +73,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
   void PEval(const fragment_t& frag, context_t& ctx,
              message_manager_t& messages) {
 
+	  /*
     auto inner_vertices = frag.InnerVertices();
     auto outer_vertices = frag.OuterVertices();
     auto vertices = frag.Vertices();
@@ -154,8 +155,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
       }
     }
     LOG(INFO) << "5. traverse vertex + edge + get_neighbor + ctx.comp_id[u]" << grape::GetCurrentTime() - start << "seconds";
-
-    /*
+*/
     double start = grape::GetCurrentTime();
 
     auto inner_vertices = frag.InnerVertices();
@@ -213,7 +213,6 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
     }
     ctx.next_modified.Swap(ctx.curr_modified);
     LOG(INFO) << "--------- 4 -----------: " << grape::GetCurrentTime() - start << "seconds";
-    */
   }
 
   void IncEval(const fragment_t& frag, context_t& ctx,
