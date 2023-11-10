@@ -229,6 +229,8 @@ class Nbr {
   TypedArray<EDATA_T> edata_array_;
 };
 
+
+
 template <typename VID_T, typename EID_T, typename EDATA_T>
 class CompactNbr {
   using vid_t = VID_T;
@@ -528,6 +530,146 @@ class AdjList {
 };
 
 template <typename VID_T, typename EID_T, typename EDATA_T>
+class NbrDefault {
+  using nbr_t = vineyard::property_graph_utils::Nbr<VID_T, EID_T>;
+  using prop_id_t = vineyard::property_graph_types::PROP_ID_TYPE;
+
+ public:
+  explicit NbrDefault(const prop_id_t& default_prop_id)
+      : default_prop_id_(default_prop_id) {}
+  NbrDefault(const nbr_t& nbr, const prop_id_t& default_prop_id)
+      : nbr_(nbr),
+        default_prop_id_(default_prop_id) {}
+  NbrDefault(const NbrDefault& rhs)
+      : nbr_(rhs.nbr_),
+        default_prop_id_(rhs.default_prop_id_) {}
+  NbrDefault(NbrDefault&& rhs)
+      : nbr_(rhs.nbr_),
+        default_prop_id_(rhs.default_prop_id_) {}
+
+  inline NbrDefault& operator=(const NbrDefault& rhs) {
+    nbr_ = rhs.nbr_;
+    default_prop_id_ = rhs.default_prop_id_;
+    return *this;
+  }
+
+  inline NbrDefault& operator=(NbrDefault&& rhs) {
+    nbr_ = std::move(rhs.nbr_);
+    default_prop_id_ = rhs.default_prop_id_;
+    return *this;
+  }
+
+  inline NbrDefault& operator=(const nbr_t& nbr) {
+    nbr_ = nbr;
+    return *this;
+  }
+
+  inline NbrDefault& operator=(nbr_t&& nbr) {
+    nbr_ = std::move(nbr);
+    return *this;
+  }
+
+  grape::Vertex<VID_T> neighbor() const {
+    return nbr_.neighbor().GetValue();
+  }
+
+  grape::Vertex<VID_T> get_neighbor() const {
+    return nbr_.get_neighbor();
+  }
+
+  grape::Vertex<VID_T> raw_neighbor() const { return nbr_.neighbor(); }
+
+  grape::Vertex<VID_T> get_raw_neighbor() const { return nbr_.neighbor(); }
+
+  EID_T edge_id() const { return nbr_.edge_id(); }
+
+  EDATA_T get_data() const {
+    return nbr_.template get_data<EDATA_T>(default_prop_id_);
+  }
+
+  std::string get_str() const { return nbr_.get_str(default_prop_id_); }
+
+  double get_double() const { return nbr_.get_double(default_prop_id_); }
+
+  int64_t get_int() const { return nbr_.get_int(default_prop_id_); }
+
+  inline const NbrDefault& operator++() const {
+    ++nbr_;
+    return *this;
+  }
+
+  inline NbrDefault operator++(int) const {
+    NbrDefault ret(nbr_, default_prop_id_);
+    ++(*this);
+    return ret;
+  }
+
+  inline const NbrDefault& operator--() const {
+    --nbr_;
+    return *this;
+  }
+
+  inline NbrDefault operator--(int) const {
+    NbrDefault ret(nbr_, default_prop_id_);
+    --(*this);
+    return ret;
+  }
+
+  inline bool operator==(const NbrDefault& rhs) const {
+    return nbr_ == rhs.nbr_;
+  }
+  inline bool operator!=(const NbrDefault& rhs) const {
+    return nbr_ != rhs.nbr_;
+  }
+  inline bool operator<(const NbrDefault& rhs) const { return nbr_ < rhs.nbr_; }
+
+  inline bool operator==(const nbr_t& nbr) const { return nbr_ == nbr; }
+  inline bool operator!=(const nbr_t& nbr) const { return nbr_ != nbr; }
+  inline bool operator<(const nbr_t& nbr) const { return nbr_ < nbr; }
+
+  inline const NbrDefault& operator*() const { return *this; }
+
+ private:
+  nbr_t nbr_;
+  prop_id_t default_prop_id_;
+};
+
+template <typename VID_T, typename EID_T, typename EDATA_T>
+class WrapAdjList {
+  using vid_t = VID_T;
+  using eid_t = EID_T;
+  using nbr_unit_t = vineyard::property_graph_utils::NbrUnit<vid_t, eid_t>;
+  using adj_list_t = vineyard::property_graph_utils::AdjList<VID_T, EID_T>;
+  using prop_id_t = vineyard::property_graph_types::PROP_ID_TYPE;
+
+ public:
+  WrapAdjList() {}
+
+  explicit WrapAdjList(const adj_list_t& adj_list,
+                        const prop_id_t& prop_id)
+      : adj_list_(adj_list),
+        prop_id_(prop_id) {}
+
+  NbrDefault<VID_T, EID_T, EDATA_T> begin() const {
+    return NbrDefault<VID_T, EID_T, EDATA_T>(adj_list_.begin(), prop_id_);
+  }
+
+  NbrDefault<VID_T, EID_T, EDATA_T> end() const {
+    return NbrDefault<VID_T, EID_T, EDATA_T>(adj_list_.end(), prop_id_);
+  }
+
+  inline size_t Size() const { return adj_list_.Size(); }
+
+  inline bool Empty() const { return adj_list_.Empty(); }
+
+  inline bool NotEmpty() const { return adj_list_.NotEmpty(); }
+
+ private:
+  adj_list_t adj_list_;
+  prop_id_t prop_id_;
+};
+
+template <typename VID_T, typename EID_T, typename EDATA_T>
 class CompactAdjList {
   using vid_t = VID_T;
   using eid_t = EID_T;
@@ -738,6 +880,7 @@ class ArrowProjectedFragment
       arrow_projected_fragment_impl::CompactAdjList<vid_t, eid_t, EDATA_T>;
   using const_adj_list_t = adj_list_t;
   using const_compact_adj_list_t = compact_adj_list_t;
+  using wrap_adj_list_t = arrow_projected_fragment_impl::WrapAdjList<vid_t, eid_t, EDATA_T>;
   using property_vertex_map_t = VERTEX_MAP_T;
   using vertex_map_t =
       ArrowProjectedVertexMap<internal_oid_t, vid_t, property_vertex_map_t>;
@@ -1384,6 +1527,14 @@ class ArrowProjectedFragment
     return adj_list_t(&oe_ptr_[oe_offsets_begin_ptr_[offset]],
                       &oe_ptr_[oe_offsets_end_ptr_[offset]],
                       edge_data_array_accessor_);
+  }
+
+  inline wrap_adj_list_t WrapGetOutgoingAdjList(const vertex_t& v) const {
+    return wrap_adj_list_t(fragment_->GetOutgoingAdjList(v, edge_label_), edge_prop_); 
+  }
+
+  inline wrap_adj_list_t WrapGetIncomingAdjList(const vertex_t& v) const {
+    return wrap_adj_list_t(fragment_->GetIncomingAdjList(v, edge_label_), edge_prop_); 
   }
 
   template <bool COMPACT_ = COMPACT>
