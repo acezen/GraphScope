@@ -59,21 +59,26 @@ struct Vertex {
     rhs.grin_v = GRIN_NULL_VERTEX;
     return *this;
   }
-  Vertex(const Vertex& rhs) : g_(rhs.g_), grin_v(GRIN_NULL_VERTEX) {
+  Vertex(const Vertex& rhs) : g_(rhs.g_), grin_v(rhs.grin_v) {
+    /*
     grin_v = rhs.grin_v;
     auto v_ref = grin_get_vertex_ref_by_vertex(g_, rhs.grin_v);
     grin_v = grin_get_vertex_from_vertex_ref(g_, v_ref);
     grin_destroy_vertex_ref(g_, v_ref);
+    */
   }
   Vertex(Vertex&& rhs) noexcept : g_(rhs.g_), grin_v(rhs.grin_v) {
     rhs.grin_v = GRIN_NULL_VERTEX;
   }
   inline Vertex& operator=(const Vertex& rhs) {
     g_ = rhs.g_;
+    grin_v = rhs.grin_v;
+    /*
     grin_v = GRIN_NULL_VERTEX;
     auto v_ref = grin_get_vertex_ref_by_vertex(g_, rhs.grin_v);
     grin_v = grin_get_vertex_from_vertex_ref(g_, v_ref);
     grin_destroy_vertex_ref(g_, v_ref);
+    */
     return *this;
   }
   ~Vertex() {
@@ -125,70 +130,70 @@ class VertexRange {
     iterator() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), cur_(0) {}
     explicit iterator(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, size_t idx) noexcept : g_(g), vl_(vl), cur_(idx) {}
     iterator(const iterator& rhs) = default;
-    iterator& operator=(const iterator& rhs) = default;
+    inline iterator& operator=(const iterator& rhs) = default;
     ~iterator() = default;
     reference_type operator*() noexcept {
       return Vertex(g_, grin_get_vertex_from_list(g_, vl_, cur_));
     }
 
-    iterator& operator++() noexcept {
+    inline iterator& operator++() noexcept {
       ++cur_;
       return *this;
     }
 
-    iterator operator++(int) noexcept {
+    inline iterator operator++(int) noexcept {
       return iterator(g_, vl_, cur_ + 1);
     }
 
-    iterator& operator--() noexcept {
+    inline iterator& operator--() noexcept {
       --cur_;
       return *this;
     }
 
-    iterator operator--(int) noexcept {
+    inline iterator operator--(int) noexcept {
       return iterator(g_, vl_, cur_--);
     }
 
-    iterator operator+(size_t offset) const noexcept {
+    inline iterator operator+(size_t offset) const noexcept {
       return iterator(g_, vl_, cur_ + offset);
     }
 
-    bool operator==(const iterator& rhs) const noexcept {
+    inline bool operator==(const iterator& rhs) const noexcept {
       return cur_ == rhs.cur_;
     }
 
-    bool operator!=(const iterator& rhs) const noexcept {
+    inline bool operator!=(const iterator& rhs) const noexcept {
       return cur_ != rhs.cur_;
     }
 
-    bool operator<(const iterator& rhs) const noexcept {
+    inline bool operator<(const iterator& rhs) const noexcept {
       return vl_ == rhs.vl_ && cur_ < rhs.cur_;
     }
   };
 
-  iterator begin() const { return iterator(g_, vl_, begin_); }
+  inline iterator begin() const { return iterator(g_, vl_, begin_); }
 
-  iterator end() const { return iterator(g_, vl_, end_); }
+  inline iterator end() const { return iterator(g_, vl_, end_); }
 
-  size_t size() const { return end_ - begin_; }
+  inline size_t size() const { return end_ - begin_; }
 
-  void Swap(VertexRange& rhs) {
+  inline void Swap(VertexRange& rhs) {
     std::swap(vl_, rhs.vl_);
     std::swap(vt_, rhs.vt_);
     std::swap(begin_, rhs.begin_);
     std::swap(end_, rhs.end_);
   }
 
-  void SetRange(const size_t begin, const size_t end) {
+  inline void SetRange(const size_t begin, const size_t end) {
     begin_ = begin;
     end_ = end;
   }
 
-  size_t begin_value() const { return begin_; }
+  inline size_t begin_value() const { return begin_; }
 
-  size_t end_value() const { return end_; }
+  inline size_t end_value() const { return end_; }
 
-  int64_t GetVertexLoc(const Vertex& v) const {
+  inline int64_t GetVertexLoc(const Vertex& v) const {
     return grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
   }
  public:
