@@ -114,7 +114,7 @@ class VertexRange {
   }
 
   class iterator {
-    using reference_type = Vertex&;
+    using reference_type = Vertex;
 
    private:
     GRIN_GRAPH g_;
