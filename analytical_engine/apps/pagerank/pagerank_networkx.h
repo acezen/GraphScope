@@ -124,12 +124,12 @@ class PageRankNetworkX
             [&ctx, base, &frag](int tid, const vertex_t& u) {
               double cur = 0;
               if (frag.directed()) {
-                auto es = frag.GetIncomingAdjList(u);
+                auto es = frag.WrapGetIncomingAdjList(u);
                 for (auto& e : es) {
                   cur += ctx.pre_result[e.get_neighbor()];
                 }
               } else {
-                auto es = frag.GetOutgoingAdjList(u);
+                auto es = frag.WrapGetOutgoingAdjList(u);
                 for (auto& e : es) {
                   cur += ctx.pre_result[e.get_neighbor()];
                 }

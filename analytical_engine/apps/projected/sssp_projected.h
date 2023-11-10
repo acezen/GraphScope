@@ -90,7 +90,7 @@ class SSSPProjected : public AppBase<FRAG_T, SSSPProjectedContext<FRAG_T>> {
       }
       ctx.modified[u] = true;
 
-      auto es = frag.GetOutgoingAdjList(u);
+      auto es = frag.WrapGetOutgoingAdjList(u);
       for (const auto& e : es) {
         auto v = e.get_neighbor();
         distv = ctx.partial_result[v];
