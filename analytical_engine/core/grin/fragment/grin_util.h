@@ -329,7 +329,7 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
   }
 
   inline T& operator[](const Vertex& loc) {
-    auto internal_id = range_.GetVertexLoc(loc);
+    // auto internal_id = range_.GetVertexLoc(loc);
     return fake_start_[loc.grin_v];
   }
   inline const T& operator[](const Vertex& loc) const {
@@ -431,7 +431,7 @@ template <typename T>
 struct Nbr {
  public:
   Nbr() : g_{GRIN_NULL_GRAPH}, al_(NULL), cur_(0) {}
-  Nbr(GRIN_GRAPH g, const GRIN_ADJACENT_LIST* al, size_t cur, GRIN_EDGE_PROPERTY prop)
+  Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, size_t cur, GRIN_EDGE_PROPERTY prop)
     : g_{g}, al_(al), cur_(cur), prop_(prop) {}
   Nbr(const Nbr& rhs) : g_(rhs.g_), al_(rhs.al_), cur_(rhs.cur_), prop_(rhs.prop_)  {}
 
@@ -444,20 +444,20 @@ struct Nbr {
   }
 
   Vertex neighbor() const {
-    return Vertex(g_, grin_get_neighbor_from_adjacent_list(g_, *al_, cur_));
+    return Vertex(g_, grin_get_neighbor_from_adjacent_list(g_, al_, cur_));
   }
 
   Vertex get_neighbor() const {
-    return Vertex(g_, grin_get_neighbor_from_adjacent_list(g_, *al_, cur_));
+    return Vertex(g_, grin_get_neighbor_from_adjacent_list(g_, al_, cur_));
   }
 
   // TODO: add a wrapper like vertex to care the destroy of edge
   GRIN_EDGE get_edge() const {
-    return grin_get_edge_from_adjacent_list(g_, *al_, cur_);
+    return grin_get_edge_from_adjacent_list(g_, al_, cur_);
   }
 
   T get_data() const {
-    auto _e = grin_get_edge_from_adjacent_list(g_, *al_, cur_);
+    auto _e = grin_get_edge_from_adjacent_list(g_, al_, cur_);
     auto type = grin_get_edge_type(g_, _e);
     T _value;
     vineyard::static_if<std::is_same<T, int64_t>{}>(
@@ -510,7 +510,7 @@ struct Nbr {
 
  private:
   GRIN_GRAPH g_;
-  const GRIN_ADJACENT_LIST* al_;
+  GRIN_ADJACENT_LIST al_;
   size_t cur_;
   GRIN_EDGE_PROPERTY prop_;
 };
@@ -606,11 +606,11 @@ class AdjList {
   ~AdjList() = default;
 
   inline nbr_t begin() const {
-    return nbr_t(g_, &adj_list_, begin_, ep_);
+    return nbr_t(g_, adj_list_, begin_, ep_);
   }
 
   inline nbr_t end() const {
-    return nbr_t(g_, &adj_list_, end_, ep_);
+    return nbr_t(g_, adj_list_, end_, ep_);
   }
 
   inline size_t Size() const { return end_ - begin_; }
