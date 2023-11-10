@@ -19,10 +19,13 @@
 #include <queue>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 #include "grape/grape.h"
 
 #include "core/app/app_base.h"
+
+using namespace std;
 
 namespace gs {
 
@@ -70,7 +73,6 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
   void PEval(const fragment_t& frag, context_t& ctx,
              message_manager_t& messages) {
 
-/*
     auto inner_vertices = frag.InnerVertices();
     auto outer_vertices = frag.OuterVertices();
     auto vertices = frag.Vertices();
@@ -79,14 +81,18 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
     for (auto v : inner_vertices) {
     	continue;
     }
-    for (auto v : outer_vertices) {
-    	continue;
-    }
-    LOG(INFO) << "--------- traverse vertex -----------: " << grape::GetCurrentTime() - start << "seconds";
+    LOG(INFO) << "1. traverse vertex: " << grape::GetCurrentTime() - start << "seconds";
 
-    double time = 0;
+
+    start = grape::GetCurrentTime();
     for (auto v : inner_vertices) {
-      start = grape::GetCurrentTime();
+      ctx.comp_id[v] = frag.GetInnerVertexGid(v);
+    }
+    LOG(INFO) << "2. traverse vertex + ctx.comp_id[v]: " << grape::GetCurrentTime() - start << "seconds";
+
+
+    start = grape::GetCurrentTime();
+    for (auto v : inner_vertices) {
       auto es = frag.GetOutgoingAdjList(v);
       for (auto& e : es) {
         continue;
@@ -98,42 +104,58 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
           continue;
         }
       }
-      time += (grape::GetCurrentTime() - start);
     }
-    LOG(INFO) << "--------- traverse edge -----------: " << time << "seconds";
+    LOG(INFO) << "----------------- 3. traverse vertex + edge: " << grape::GetCurrentTime() - start << "seconds";
 
 
-    double get_neighbor_time = 0;
-    double get_data_time = 0;
-
+    start = grape::GetCurrentTime();
     for (auto v : inner_vertices) {
       auto es = frag.GetOutgoingAdjList(v);
       for (auto& e : es) {
-	start = grape::GetCurrentTime();
 	auto u = e.get_neighbor();
-	get_neighbor_time += (grape::GetCurrentTime() - start);
-
-	start = grape::GetCurrentTime();
-	double d = static_cast<double>(e.get_data());
-	get_data_time += (grape::GetCurrentTime() - start);
+	if (ctx.comp_id[u] == 100) { std::cout << "......" << std::endl; }
       }
 
       auto es2 = frag.GetIncomingAdjList(v);
       if (frag.directed()) {
         for (auto& e : es2) {
-	  start = grape::GetCurrentTime();
 	  auto u = e.get_neighbor();
-	  get_neighbor_time += (grape::GetCurrentTime() - start);
-
-	  start = grape::GetCurrentTime();
-	  double d = static_cast<double>(e.get_data());
-	  get_data_time += (grape::GetCurrentTime() - start);
+	  if (ctx.comp_id[u] == 100) { std::cout << "......" << std::endl; }
         }
       }
     }
-    LOG(INFO) << "--------- total edge get neighbor -----------: " << get_neighbor_time << "seconds";
-    LOG(INFO) << "--------- total edge get data -----------: " << get_data_time << "seconds";
-*/
+    LOG(INFO) << "----------------- 4. traverse vertex + edge + get_neighbor " << grape::GetCurrentTime() - start << "seconds";
+
+
+    start = grape::GetCurrentTime();
+    for (auto v : inner_vertices) {
+      auto cid = ctx.comp_id[v];
+
+      auto es = frag.GetOutgoingAdjList(v);
+      for (auto& e : es) {
+        auto u = e.get_neighbor();
+	if (ctx.comp_id[u] == 100) { std::cout << "......" << std::endl; }
+        if (ctx.comp_id[u] > cid) {
+          ctx.comp_id[u] = cid;
+          ctx.next_modified[u] = true;
+        }
+      }
+
+      auto es2 = frag.GetIncomingAdjList(v);
+      if (frag.directed()) {
+        for (auto& e : es2) {
+          auto u = e.get_neighbor();
+	  if (ctx.comp_id[u] == 100) { std::cout << "......" << std::endl; }
+          if (ctx.comp_id[u] > cid) {
+            ctx.comp_id[u] = cid;
+            ctx.next_modified[u] = true;
+          }
+        }
+      }
+    }
+    LOG(INFO) << "----------------- 5. traverse vertex + edge + get_neighbor + ctx.comp_id[u]" << grape::GetCurrentTime() - start << "seconds";
+
+    /*
     double start = grape::GetCurrentTime();
 
     auto inner_vertices = frag.InnerVertices();
@@ -191,6 +213,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
     }
     ctx.next_modified.Swap(ctx.curr_modified);
     LOG(INFO) << "--------- 4 -----------: " << grape::GetCurrentTime() - start << "seconds";
+    */
   }
 
   void IncEval(const fragment_t& frag, context_t& ctx,
