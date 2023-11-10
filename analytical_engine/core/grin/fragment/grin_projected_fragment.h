@@ -86,12 +86,12 @@ class GRINProjectedFragment {
     grin_destroy_vertex_list(g_, tvl_);
     grin_destroy_vertex_list(g_, ivl_);
     grin_destroy_vertex_list(g_, ovl_);
-    for (const auto& al : v2iadj_) {
-      grin_destroy_adjacent_list(g_, al);
+    for (size_t i = 0; i < ivnum_; ++i) {
+      grin_destroy_adjacent_list(g_, v2iadj_[i]);
+      grin_destroy_adjacent_list(g_, v2oadj_[i]);
     }
-    for (const auto& al : v2oadj_) {
-      grin_destroy_adjacent_list(g_,al);
-    }
+    delete [] v2iadj_;
+    delete [] v2oadj_;
     /*
     grin_destropy_vertex_type(g_, vt_);
     grin_destropy_edge_type(g_, et_);
@@ -128,8 +128,8 @@ class GRINProjectedFragment {
     tvnum_ = grin_get_vertex_list_size(g_, tvl_);
     ivnum_ = grin_get_vertex_list_size(g_, ivl_);
     ovnum_ = grin_get_vertex_list_size(g_, ovl_);
-    v2iadj_.resize(ivnum_);
-    v2oadj_.resize(ivnum_);
+    v2iadj_ = new GRIN_ADJACENT_LIST[ivnum_];
+    v2oadj_ = new GRIN_ADJACENT_LIST[ivnum_];
 
     for (size_t i = 0; i < ivnum_; ++i) {
       auto v = grin_get_vertex_from_list(g_, ivl_, i);
@@ -368,7 +368,7 @@ class GRINProjectedFragment {
 
   inline adj_list_t GetIncomingAdjList(const vertex_t& v) const {
     auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
-    auto al = v2iadj_.at(v.grin_v);
+    auto al = v2iadj_[v.grin_v];
     // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v.grin_v, et_);
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     auto sz = grin_get_adjacent_list_size(g_, al);
@@ -379,7 +379,7 @@ class GRINProjectedFragment {
 
   inline adj_list_t GetOutgoingAdjList(const vertex_t& v) const {
     auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
-    auto al = v2oadj_.at(v.grin_v);
+    auto al = v2oadj_[internal_id];
     // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v.grin_v, et_);
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     auto sz = grin_get_adjacent_list_size(g_, al);
@@ -390,7 +390,7 @@ class GRINProjectedFragment {
 
   inline adj_list_t WrapGetOutgoingAdjList(const vertex_t& v) const {
     auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
-    auto al = v2oadj_.at(v.grin_v);
+    auto al = v2oadj_[internal_id];
     // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v.grin_v, et_);
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     auto sz = grin_get_adjacent_list_size(g_, al);
@@ -401,7 +401,7 @@ class GRINProjectedFragment {
 
   inline adj_list_t WrapGetIncomingAdjList(const vertex_t& v) const {
     auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
-    auto al = v2iadj_.at(v.grin_v);
+    auto al = v2iadj_[internal_id];
     // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v.grin_v, et_);
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
     auto sz = grin_get_adjacent_list_size(g_, al);
@@ -412,7 +412,7 @@ class GRINProjectedFragment {
 
   inline int GetLocalOutDegree(const vertex_t& v) const {
     auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
-    auto al = v2oadj_.at(internal_id);
+    auto al = v2oadj_[internal_id];
 
     // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v.grin_v, et_);
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
@@ -431,7 +431,7 @@ class GRINProjectedFragment {
 
   inline int GetLocalInDegree(const vertex_t& v) const {
     auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
-    auto al = v2iadj_.at(internal_id);
+    auto al = v2iadj_[internal_id];
 
     // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v.grin_v, et_);
 #ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
@@ -552,7 +552,7 @@ class GRINProjectedFragment {
         auto v = grin_get_vertex_from_list(g_, ivl_, i);
         auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v);
         if (in_edge) {
-          auto al = v2iadj_.at(internal_id);
+          auto al = v2iadj_[internal_id];
           // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v, et_);
           auto sz = grin_get_adjacent_list_size(g_, al);
           for (size_t j = 0; j < sz; ++j) {
@@ -573,7 +573,7 @@ class GRINProjectedFragment {
           }
         }
         if (out_edge) {
-          auto al = v2oadj_.at(internal_id);
+          auto al = v2oadj_[internal_id];
           // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v, et_);
           auto sz = grin_get_adjacent_list_size(g_, al);
           for (size_t j = 0; j < sz; ++j) {
@@ -618,7 +618,7 @@ class GRINProjectedFragment {
         auto v = grin_get_vertex_from_iter(g_, iv_iter);
         auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v);
         if (in_edge) {
-          auto al = v2iadj_.at(internal_id);
+          auto al = v2iadj_[internal_id];
           // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v, et_);
           auto e_iter = grin_get_adjacent_list_begin(g_, al);
           while (!grin_is_adjacent_list_end(g_, e_iter)) {
@@ -640,7 +640,7 @@ class GRINProjectedFragment {
           }
         }
         if (out_edge) {
-          auto al = v2oadj_.at(internal_id);
+          auto al = v2oadj_[internal_id];
           // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v, et_);
           auto e_iter = grin_get_adjacent_list_begin(g_, al);
           while (!grin_is_adjacent_list_end(g_, e_iter)) {
@@ -695,8 +695,8 @@ class GRINProjectedFragment {
 
   GRIN_VERTEX_TYPE vt_;
   GRIN_EDGE_TYPE et_;
-  std::vector<GRIN_ADJACENT_LIST> v2iadj_;
-  std::vector<GRIN_ADJACENT_LIST> v2oadj_;
+  GRIN_ADJACENT_LIST* v2iadj_;
+  GRIN_ADJACENT_LIST* v2oadj_;
 
   GRIN_VERTEX_LIST ivl_, ovl_, tvl_;
 };
