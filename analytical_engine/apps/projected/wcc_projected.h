@@ -93,12 +93,12 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
 
     start = grape::GetCurrentTime();
     for (auto v : inner_vertices) {
-      auto es = frag.GetOutgoingAdjList(v);
+      auto es = frag.WrapGetOutgoingAdjList(v);
       for (auto& e : es) {
         continue;
       }
 
-      auto es2 = frag.GetIncomingAdjList(v);
+      auto es2 = frag.WrapGetIncomingAdjList(v);
       if (frag.directed()) {
         for (auto& e : es2) {
           continue;
@@ -110,13 +110,13 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
 
     start = grape::GetCurrentTime();
     for (auto v : inner_vertices) {
-      auto es = frag.GetOutgoingAdjList(v);
+      auto es = frag.WrapGetOutgoingAdjList(v);
       for (auto& e : es) {
 	auto u = e.get_neighbor();
 	if (ctx.comp_id[u] == -1) { std::cout << "......" << std::endl; }
       }
 
-      auto es2 = frag.GetIncomingAdjList(v);
+      auto es2 = frag.WrapGetIncomingAdjList(v);
       if (frag.directed()) {
         for (auto& e : es2) {
 	  auto u = e.get_neighbor();
@@ -131,7 +131,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
     for (auto v : inner_vertices) {
       auto cid = ctx.comp_id[v];
 
-      auto es = frag.GetOutgoingAdjList(v);
+      auto es = frag.WrapGetOutgoingAdjList(v);
       for (auto& e : es) {
         auto u = e.get_neighbor();
 	if (ctx.comp_id[u] == -1) { std::cout << "......" << std::endl; }
@@ -141,7 +141,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
         }
       }
 
-      auto es2 = frag.GetIncomingAdjList(v);
+      auto es2 = frag.WrapGetIncomingAdjList(v);
       if (frag.directed()) {
         for (auto& e : es2) {
           auto u = e.get_neighbor();
