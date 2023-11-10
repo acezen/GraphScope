@@ -105,7 +105,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
         }
       }
     }
-    LOG(INFO) << "----------------- 3. traverse vertex + edge: " << grape::GetCurrentTime() - start << "seconds";
+    LOG(INFO) << "3. traverse vertex + edge: " << grape::GetCurrentTime() - start << "seconds";
 
 
     start = grape::GetCurrentTime();
@@ -113,18 +113,18 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
       auto es = frag.GetOutgoingAdjList(v);
       for (auto& e : es) {
 	auto u = e.get_neighbor();
-	if (ctx.comp_id[u] == 100) { std::cout << "......" << std::endl; }
+	if (ctx.comp_id[u] == -1) { std::cout << "......" << std::endl; }
       }
 
       auto es2 = frag.GetIncomingAdjList(v);
       if (frag.directed()) {
         for (auto& e : es2) {
 	  auto u = e.get_neighbor();
-	  if (ctx.comp_id[u] == 100) { std::cout << "......" << std::endl; }
+	  if (ctx.comp_id[u] == -1) { std::cout << "......" << std::endl; }
         }
       }
     }
-    LOG(INFO) << "----------------- 4. traverse vertex + edge + get_neighbor " << grape::GetCurrentTime() - start << "seconds";
+    LOG(INFO) << "4. traverse vertex + edge + get_neighbor " << grape::GetCurrentTime() - start << "seconds";
 
 
     start = grape::GetCurrentTime();
@@ -134,7 +134,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
       auto es = frag.GetOutgoingAdjList(v);
       for (auto& e : es) {
         auto u = e.get_neighbor();
-	if (ctx.comp_id[u] == 100) { std::cout << "......" << std::endl; }
+	if (ctx.comp_id[u] == -1) { std::cout << "......" << std::endl; }
         if (ctx.comp_id[u] > cid) {
           ctx.comp_id[u] = cid;
           ctx.next_modified[u] = true;
@@ -145,7 +145,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
       if (frag.directed()) {
         for (auto& e : es2) {
           auto u = e.get_neighbor();
-	  if (ctx.comp_id[u] == 100) { std::cout << "......" << std::endl; }
+	  if (ctx.comp_id[u] == -1) { std::cout << "......" << std::endl; }
           if (ctx.comp_id[u] > cid) {
             ctx.comp_id[u] = cid;
             ctx.next_modified[u] = true;
@@ -153,7 +153,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
         }
       }
     }
-    LOG(INFO) << "----------------- 5. traverse vertex + edge + get_neighbor + ctx.comp_id[u]" << grape::GetCurrentTime() - start << "seconds";
+    LOG(INFO) << "5. traverse vertex + edge + get_neighbor + ctx.comp_id[u]" << grape::GetCurrentTime() - start << "seconds";
 
     /*
     double start = grape::GetCurrentTime();
