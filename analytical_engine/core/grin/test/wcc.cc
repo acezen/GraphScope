@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
 
 
   gettimeofday(&t2, NULL);
-  elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;
+  elapsedTime = (t2.tv_sec - t1.tv_sec);
   elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0 / 1000.0; 
   printf("------------- 2 -------------: %lf s.\n", elapsedTime);
 
@@ -142,7 +142,7 @@ int main(int argc, char** argv) {
   }
 
   gettimeofday(&t2, NULL);
-  elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;
+  elapsedTime = (t2.tv_sec - t1.tv_sec);
   elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0 / 1000.0; 
   printf("------------- 3 -------------: %lf s.\n", elapsedTime);
 
