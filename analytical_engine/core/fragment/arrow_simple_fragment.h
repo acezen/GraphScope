@@ -40,6 +40,194 @@ namespace gs {
 
 namespace arrow_simple_fragment_impl {
 
+
+template <typename T>
+class VertexRange {
+ public:
+  using vertex_t = grape::Vertex<T>;
+
+  VertexRange() {}
+  VertexRange(const T& begin, size_t start, size_t end) 
+      : begin_(begin), start_(start), end_(end) {}
+  VertexRange(const VertexRange& r) : begin_(r.begin_), start_(r.start_), end_(r.end_) {}
+
+  class iterator {
+    using reference_type = grape::Vertex<T>;
+
+   private:
+    T begin_;
+    size_t cur_;
+
+   public:
+    iterator() noexcept : cur_() {}
+    explicit iterator(const T& begin, const T& cur) noexcept : begin_(begin), cur_(cur) {}
+
+    inline reference_type operator*() noexcept { return grape::Vertex(begin_ + cur_); }
+
+    inline iterator& operator++() noexcept {
+      ++cur_;
+      return *this;
+    }
+
+    inline iterator operator++(int) noexcept {
+      iterator ret = *this;
+      ++*this;
+      return ret;
+    }
+
+    inline iterator& operator--() noexcept {
+      --cur_;
+      return *this;
+    }
+
+    inline iterator operator--(int) noexcept {
+      iterator ret = *this;
+      --*this;
+      return ret;
+    }
+
+    inline iterator operator+(size_t offset) const noexcept {
+      return iterator(begin_, cur_ + offset);
+    }
+
+    inline bool operator==(const iterator& rhs) const noexcept {
+      return cur_ == rhs.cur_;
+    }
+
+    inline bool operator!=(const iterator& rhs) const noexcept {
+      return cur_ != rhs.cur_;
+    }
+
+    inline bool operator<(const iterator& rhs) const noexcept {
+      return cur_ < rhs.cur_;
+    }
+  };
+
+  inline iterator begin() const { return iterator(begin_, start_); }
+
+  inline iterator end() const { return iterator(begin_, end_); }
+
+  inline size_t size() const { return end_ - start_; }
+
+  void Swap(VertexRange& rhs) {
+#ifdef __CUDACC__
+    thrust::swap(begin_, rhs.begin_);
+    thrust::swap(end_, rhs.end_);
+#else
+    std::swap(begin_, rhs.begin_);
+    std::swap(end_, rhs.end_);
+#endif
+  }
+
+  void SetRange(size_t start, size_t end) {
+    start_ = start_; 
+    end_ = end;
+  }
+
+  const T& begin_value() const { return begin_; }
+
+  const T& end_value() const { return end_; }
+
+  inline bool Contain(const grape::Vertex<T>& v) const {
+    return begin_ <= v.GetValue() && v.GetValue() < end_;
+  }
+
+ private:
+  T begin_;
+  size_t start_, end_;
+};
+
+template <typename T>
+bool operator<(grape::Vertex<T> const& lhs, grape::Vertex<T> const& rhs) {
+  return lhs.GetValue() < rhs.GetValue();
+}
+
+template <typename T>
+bool operator==(grape::Vertex<T> const& lhs, grape::Vertex<T> const& rhs) {
+  return lhs.GetValue() == rhs.GetValue();
+}
+
+template <typename VERTEX_SET_T, typename T>
+class VertexArray {};
+
+template <typename VID_T, typename T>
+class VertexArray<VertexRange<VID_T>, T> : public grape::Array<T, grape::Allocator<T>> {
+  using Base = grape::Array<T, grape::Allocator<T>>;
+
+ public:
+  VertexArray() : Base(), fake_start_(NULL) {
+    id_parser_.Init(1, 1);
+  }
+  explicit VertexArray(const VertexRange<VID_T>& range)
+      : Base(range.size()), range_(range) {
+    fake_start_ = Base::data();
+    id_parser_.Init(1, 1);
+  }
+  VertexArray(const VertexRange<VID_T>& range, const T& value)
+      : Base(range.size(), value), range_(range) {
+    fake_start_ = Base::data();
+    id_parser_.Init(1, 1);
+  }
+
+  ~VertexArray() = default;
+
+  void Init(const VertexRange<VID_T>& range) {
+    Base::clear();
+    Base::resize(range.size());
+    range_ = range;
+    fake_start_ = Base::data();
+  }
+
+  void Init(const VertexRange<VID_T>& range, const T& value) {
+    Base::clear();
+    Base::resize(range.size(), value);
+    range_ = range;
+    fake_start_ = Base::data();
+  }
+
+  void SetValue(VertexRange<VID_T>& range, const T& value) {
+    std::fill_n(&Base::data()[range.begin_value() - range_.begin_value()],
+                range.size(), value);
+  }
+  void SetValue(const grape::Vertex<VID_T>& loc, const T& value) {
+    auto internal_id = id_parser_.GetOffset(loc.GetValue());
+    fake_start_[internal_id] = value;
+  }
+
+  void SetValue(const T& value) {
+    std::fill_n(Base::data(), Base::size(), value);
+  }
+
+  inline T& operator[](const grape::Vertex<VID_T>& loc) {
+    auto internal_id = id_parser_.GetOffset(loc.GetValue());
+    return fake_start_[internal_id];
+  }
+  inline const T& operator[](const grape::Vertex<VID_T>& loc) const {
+    auto internal_id = id_parser_.GetOffset(loc.GetValue());
+    return fake_start_[internal_id];
+  }
+
+  void Swap(VertexArray& rhs) {
+    Base::swap((Base&) rhs);
+    range_.Swap(rhs.range_);
+    std::swap(fake_start_, rhs.fake_start_);
+  }
+
+  void Clear() {
+    VertexArray ga;
+    this->Swap(ga);
+  }
+
+  const VertexRange<VID_T>& GetVertexRange() const { return range_; }
+
+ private:
+  void Resize() {}
+
+  VertexRange<VID_T> range_;
+  T* fake_start_;
+  vineyard::IdParser<VID_T> id_parser_;
+};
+
 template <typename VID_T, typename EID_T, typename EDATA_T>
 class NbrDefault {
   using nbr_t = vineyard::property_graph_utils::Nbr<VID_T, EID_T>;
@@ -48,100 +236,83 @@ class NbrDefault {
  public:
   explicit NbrDefault(const prop_id_t& default_prop_id)
       : default_prop_id_(default_prop_id) {}
-  NbrDefault(const nbr_t& nbr, const prop_id_t& default_prop_id)
-      : nbr_(nbr),
+  NbrDefault(const nbr_t& begin, size_t cur, const prop_id_t& default_prop_id)
+      : begin_(begin),
+        cur_(cur),
         default_prop_id_(default_prop_id) {}
   NbrDefault(const NbrDefault& rhs)
-      : nbr_(rhs.nbr_),
+      : begin_(rhs.begin_),
+        cur_(rhs.cur_),
         default_prop_id_(rhs.default_prop_id_) {}
   NbrDefault(NbrDefault&& rhs)
-      : nbr_(rhs.nbr_),
+      : begin_(rhs.begin_),
+        cur_(rhs.cur_),
         default_prop_id_(rhs.default_prop_id_) {}
 
   inline NbrDefault& operator=(const NbrDefault& rhs) {
-    nbr_ = rhs.nbr_;
+    begin_ = rhs.begin_;
+    cur_ = rhs.cur_;
     default_prop_id_ = rhs.default_prop_id_;
     return *this;
   }
 
   inline NbrDefault& operator=(NbrDefault&& rhs) {
-    nbr_ = std::move(rhs.nbr_);
+    begin_ = std::move(rhs.begin_);
+    cur_ = rhs.cur_;
     default_prop_id_ = rhs.default_prop_id_;
     return *this;
   }
 
-  inline NbrDefault& operator=(const nbr_t& nbr) {
-    nbr_ = nbr;
-    return *this;
-  }
-
-  inline NbrDefault& operator=(nbr_t&& nbr) {
-    nbr_ = std::move(nbr);
-    return *this;
-  }
-
   grape::Vertex<VID_T> neighbor() const {
-    return nbr_.neighbor().GetValue();
+    auto nbr = begin_ + cur_;
+    return grape::Vertex<VID_T>(nbr.neighbor().GetValue());
   }
 
   grape::Vertex<VID_T> get_neighbor() const {
-    return nbr_.get_neighbor();
+    auto nbr = begin_ + cur_;
+    return grape::Vertex<VID_T>(nbr.neighbor().GetValue());
   }
-
-  grape::Vertex<VID_T> raw_neighbor() const { return nbr_.neighbor(); }
-
-  grape::Vertex<VID_T> get_raw_neighbor() const { return nbr_.neighbor(); }
-
-  EID_T edge_id() const { return nbr_.edge_id(); }
 
   EDATA_T get_data() const {
-    return nbr_.template get_data<EDATA_T>(default_prop_id_);
+    auto nbr = begin_ + cur_;
+    return nbr.template get_data<EDATA_T>(default_prop_id_);
   }
 
-  std::string get_str() const { return nbr_.get_str(default_prop_id_); }
-
-  double get_double() const { return nbr_.get_double(default_prop_id_); }
-
-  int64_t get_int() const { return nbr_.get_int(default_prop_id_); }
-
-  inline const NbrDefault& operator++() const {
-    ++nbr_;
+  inline const NbrDefault& operator++() {
+    ++cur_;
     return *this;
   }
 
-  inline NbrDefault operator++(int) const {
-    NbrDefault ret(nbr_, default_prop_id_);
+  inline NbrDefault operator++(int) {
+    NbrDefault ret(begin_, cur_, default_prop_id_);
     ++(*this);
     return ret;
   }
 
-  inline const NbrDefault& operator--() const {
-    --nbr_;
+  inline NbrDefault& operator--() {
+    --cur_;
     return *this;
   }
 
-  inline NbrDefault operator--(int) const {
-    NbrDefault ret(nbr_, default_prop_id_);
+  inline NbrDefault operator--(int) {
+    NbrDefault ret(begin_, cur_, default_prop_id_);
     --(*this);
     return ret;
   }
 
   inline bool operator==(const NbrDefault& rhs) const {
-    return nbr_ == rhs.nbr_;
+    return begin_ == rhs.begin_ && cur_ == rhs.cur_;
   }
   inline bool operator!=(const NbrDefault& rhs) const {
-    return nbr_ != rhs.nbr_;
+    return begin_ != rhs.begin_ || cur_ != rhs.cur_;
   }
-  inline bool operator<(const NbrDefault& rhs) const { return nbr_ < rhs.nbr_; }
-
-  inline bool operator==(const nbr_t& nbr) const { return nbr_ == nbr; }
-  inline bool operator!=(const nbr_t& nbr) const { return nbr_ != nbr; }
-  inline bool operator<(const nbr_t& nbr) const { return nbr_ < nbr; }
+  inline bool operator<(const NbrDefault& rhs) const { return begin_ == rhs.begin_ && cur_ < rhs.cur_; }
 
   inline const NbrDefault& operator*() const { return *this; }
 
  private:
-  nbr_t nbr_;
+  nbr_t begin_;
+  size_t cur_;
   prop_id_t default_prop_id_;
 };
 
@@ -157,16 +328,16 @@ class WrapAdjList {
   WrapAdjList() {}
 
   explicit WrapAdjList(const adj_list_t& adj_list,
-                        const prop_id_t& prop_id)
+                        const prop_id_t& prop_id, size_t begin, size_t end)
       : adj_list_(adj_list),
-        prop_id_(prop_id) {}
+        prop_id_(prop_id), begin_(begin), end_(end) {}
 
   NbrDefault<VID_T, EID_T, EDATA_T> begin() const {
-    return NbrDefault<VID_T, EID_T, EDATA_T>(adj_list_.begin(), prop_id_);
+    return NbrDefault<VID_T, EID_T, EDATA_T>(adj_list_.begin(), begin_, prop_id_);
   }
 
   NbrDefault<VID_T, EID_T, EDATA_T> end() const {
-    return NbrDefault<VID_T, EID_T, EDATA_T>(adj_list_.end(), prop_id_);
+    return NbrDefault<VID_T, EID_T, EDATA_T>(adj_list_.begin(), end_, prop_id_);
   }
 
   inline size_t Size() const { return adj_list_.Size(); }
@@ -178,6 +349,8 @@ class WrapAdjList {
  private:
   adj_list_t adj_list_;
   prop_id_t prop_id_;
+  size_t begin_;
+  size_t end_;
 };
 
 }  // namespace arrow_flattened_fragment_impl
@@ -217,19 +390,19 @@ class ArrowSimpleFragment {
   using fid_t = grape::fid_t;
   using label_id_t = typename fragment_t::label_id_t;
   using prop_id_t = vineyard::property_graph_types::PROP_ID_TYPE;
-  using vertex_range_t = grape::VertexRange<vid_t>;
+  using vertex_range_t = arrow_simple_fragment_impl::VertexRange<vid_t>;
   using inner_vertices_t = vertex_range_t;
   using outer_vertices_t = vertex_range_t;
   using vertices_t = vertex_range_t;
 
   template <typename DATA_T>
-  using vertex_array_t = grape::VertexArray<vertices_t, DATA_T>;
+  using vertex_array_t = arrow_simple_fragment_impl::VertexArray<vertices_t, DATA_T>;
 
   template <typename DATA_T>
-  using inner_vertex_array_t = grape::VertexArray<inner_vertices_t, DATA_T>;
+  using inner_vertex_array_t = arrow_simple_fragment_impl::VertexArray<inner_vertices_t, DATA_T>;
 
   template <typename DATA_T>
-  using outer_vertex_array_t = grape::VertexArray<outer_vertices_t, DATA_T>;
+  using outer_vertex_array_t = arrow_simple_fragment_impl::VertexArray<outer_vertices_t, DATA_T>;
 
   using adj_list_t =
       arrow_simple_fragment_impl::WrapAdjList<vid_t, eid_t, edata_t>;
@@ -276,14 +449,19 @@ class ArrowSimpleFragment {
 
   inline bool directed() const { return fragment_->directed(); }
 
-  inline vertex_range_t Vertices() const { return fragment_->Vertices(vertex_label_); }
+  inline vertex_range_t Vertices() const { 
+    auto vr = fragment_->Vertices(vertex_label_);
+    return vertex_range_t(vr.begin_value(), 0, vr.size());
+  }
 
   inline vertex_range_t InnerVertices() const {
-    return fragment_->InnerVertices(vertex_label_);
+    auto vr = fragment_->InnerVertices(vertex_label_);
+    return vertex_range_t(vr.begin_value(), 0, vr.size());
   }
 
   inline vertex_range_t OuterVertices() const {
-    return fragment_->OuterVertices(vertex_label_);
+    auto vr = fragment_->OuterVertices(vertex_label_);
+    return vertex_range_t(vr.begin_value(), 0, vr.size());
   }
 
   inline bool GetVertex(const oid_t& oid, vertex_t& v) const {
@@ -371,19 +549,13 @@ class ArrowSimpleFragment {
   }
 
   inline adj_list_t GetOutgoingAdjList(const vertex_t& v) const {
-    return adj_list_t(fragment_->GetOutgoingAdjList(v, edge_label_), edge_prop_); 
+    auto al = fragment_->GetOutgoingAdjList(v, edge_label_);
+    return adj_list_t(al, 0, al.Size(), edge_prop_); 
   }
 
   inline adj_list_t GetIncomingAdjList(const vertex_t& v) const {
-    return adj_list_t(fragment_->GetIncomingAdjList(v, edge_label_), edge_prop_); 
-  }
-
-  inline adj_list_t WrapGetOutgoingAdjList(const vertex_t& v) const {
-    return adj_list_t(fragment_->GetOutgoingAdjList(v, edge_label_), edge_prop_); 
-  }
-
-  inline adj_list_t WrapGetIncomingAdjList(const vertex_t& v) const {
-    return adj_list_t(fragment_->GetIncomingAdjList(v, edge_label_), edge_prop_); 
+    auto al = fragment_->GetOutgoingAdjList(v, edge_label_);
+    return adj_list_t(al, 0, al.Size(), edge_prop_); 
   }
 
   inline int GetLocalOutDegree(const vertex_t& v) const {
