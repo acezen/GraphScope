@@ -154,7 +154,7 @@ class VertexRange {
   }
 
   class iterator {
-    using reference_type = Vertex&;
+    using reference_type = Vertex;
 
    private:
     GRIN_GRAPH g_;
@@ -168,8 +168,7 @@ class VertexRange {
     inline iterator& operator=(const iterator& rhs) = default;
     ~iterator() = default;
     reference_type operator*() noexcept {
-      // return Vertex(g_, grin_get_vertex_from_list(g_, vl_, cur_));
-      return cur_;
+      return Vertex(cur_);
     }
 
     inline iterator& operator++() noexcept {
