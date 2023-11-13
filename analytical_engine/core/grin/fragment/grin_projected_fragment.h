@@ -363,8 +363,9 @@ class GRINProjectedFragment {
   }
 
   inline gid_t GetInnerVertexGid(const vertex_t& v) const {
-    auto ref = grin_get_vertex_ref_by_vertex(g_, v.grin_v);
-    return grin_serialize_vertex_ref_as_int64(g_, ref);
+    return v.grin_v;
+    // auto ref = grin_get_vertex_ref_by_vertex(g_, v.grin_v);
+    // return grin_serialize_vertex_ref_as_int64(g_, ref);
   }
 
   inline adj_list_t GetIncomingAdjList(const vertex_t& v) const {

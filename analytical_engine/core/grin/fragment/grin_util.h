@@ -313,7 +313,7 @@ class VertexRange { // TODO(wanglei): add vtype as member
   const size_t end_value() const { return size_; }
 
   int64_t GetVertexLoc(const Vertex& v) const {
-     auto vt = grin_get_vertex_type(g_, v.grin_v);
+    auto vt = grin_get_vertex_type(g_, v.grin_v);
     return grin_get_vertex_internal_id_by_type(g_, vt, v.grin_v);
   }
 
@@ -360,8 +360,8 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
                 range.size(), value);
   }
   void SetValue(const Vertex& loc, const T& value) {
-    auto internal_id = range_.GetVertexLoc(loc);
-    fake_start_[internal_id] = value;
+    // auto internal_id = range_.GetVertexLoc(loc);
+    fake_start_[loc.grin_v] = value;
   }
 
   void SetValue(const T& value) {
@@ -369,12 +369,12 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
   }
 
   inline T& operator[](const Vertex& loc) {
-    auto internal_id = range_.GetVertexLoc(loc);
-    return fake_start_[internal_id];
+    // auto internal_id = range_.GetVertexLoc(loc);
+    return fake_start_[loc.grin_v];
   }
   inline const T& operator[](const Vertex& loc) const {
-    auto internal_id = range_.GetVertexLoc(loc);
-    return fake_start_[internal_id];
+    // auto internal_id = range_.GetVertexLoc(loc);
+    return fake_start_[loc.grin_v];
   }
 
   void Swap(VertexArray& rhs) {
