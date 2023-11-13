@@ -281,30 +281,6 @@ if(Arrow_FOUND AND Arrow_VERSION VERSION_GREATER 9.0.1)
     set(CMAKE_CXX_STANDARD 17)
 endif()
 
-# Generate proto
-execute_process(COMMAND python3 ../proto/proto_generator.py "${PROJECT_SOURCE_DIR}/proto" --cpp
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-
-file(GLOB PROTO_CPP_FILES "proto/*.cc")
-file(GLOB CORE_RPC_SRC_FILES "core/server/*.cc")
-
-# Add targets
-add_library(gs_proto SHARED ${PROTO_CPP_FILES})
-set_source_files_properties(${PROTO_CPP_FILES} PROPERTIES COMPILE_FLAGS -Wno-array-bounds)
-target_include_directories(gs_proto PRIVATE "${PROJECT_SOURCE_DIR}/proto")
-target_link_libraries(gs_proto PUBLIC
-        ${Protobuf_LIBRARIES}
-        ${GRPC_LIBRARIES}
-    )
-
-add_library(gs_util SHARED "core/flags.cc" "core/launcher.cc")
-target_link_libraries(gs_util PRIVATE
-    ${LIBGRAPELITE_LIBRARIES}
-    ${GFLAGS_LIBRARIES}
-    ${VINEYARD_LIBRARIES}
-    ${Boost_LIBRARIES}
-)
-
 if (ENABLE_JAVA_SDK)
     target_sources(gs_util PRIVATE "core/java/javasdk.cc")
     target_compile_definitions(gs_util PUBLIC ENABLE_JAVA_SDK)
@@ -314,23 +290,6 @@ if (ENABLE_JAVA_SDK)
     )
 endif()
 
-add_executable(grape_engine
-        "core/grape_engine.cc"
-        "core/grape_instance.cc"
-        "core/object/dynamic.cc"
-        ${CORE_RPC_SRC_FILES}
-    )
-target_include_directories(grape_engine PRIVATE proto utils)
-target_link_libraries(grape_engine PRIVATE
-    gs_proto
-    gs_util
-    ${LIBGRAPELITE_LIBRARIES}
-    ${GFLAGS_LIBRARIES}
-    ${CMAKE_DL_LIBS}
-    ${Boost_LIBRARIES}
-    ${VINEYARD_LIBRARIES}
-)
-
 if (ENABLE_JAVA_SDK)
     target_compile_definitions(grape_engine PUBLIC ENABLE_JAVA_SDK)
 endif()
@@ -338,11 +297,7 @@ endif()
 if (LET_IT_CRASH_ON_EXCEPTION)
     target_compile_definitions(grape_engine PRIVATE LET_IT_CRASH_ON_EXCEPTION)
 endif ()
-target_link_libraries(grape_engine PRIVATE OpenMP::OpenMP_CXX)
 
-if (${LIBUNWIND_FOUND})
-    target_link_libraries(grape_engine PRIVATE ${LIBUNWIND_LIBRARIES})
-endif ()
 
 # An executable to work around for graphx pregel.
 if (ENABLE_JAVA_SDK)
@@ -487,8 +442,8 @@ if (BUILD_GRIN)
         # add_executable(${target} ${add_grin_vineyard_app_SRCS})
         target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /usr/local/include/grin)
         # target_include_directories(${target} PRIVATE /workspaces/GraphScope-GRIN/GART)
-        target_link_libraries(${target} PRIVATE gs_proto ${LIBGRAPELITE_LIBRARIES} ${VINEYARD_LIBRARIES} vineyard_grin)
-        # target_link_libraries(${target} PRIVATE gs_proto ${LIBGRAPELITE_LIBRARIES} ${VINEYARD_LIBRARIES} "/workspaces/GraphScope-GRIN/GART/interfaces/grin/build/libgart_grin.so")
+        target_link_libraries(${target} PRIVATE  ${LIBGRAPELITE_LIBRARIES} ${VINEYARD_LIBRARIES} vineyard_grin)
+        # target_link_libraries(${target} PRIVATE  ${LIBGRAPELITE_LIBRARIES} ${VINEYARD_LIBRARIES} "/workspaces/GraphScope-GRIN/GART/interfaces/grin/build/libgart_grin.so")
         if (${LIBUNWIND_FOUND})
             target_link_libraries(${target} PRIVATE ${LIBUNWIND_LIBRARIES})
         endif ()
@@ -605,10 +560,6 @@ macro(install_gsa_dependency_modules cmake_target)
             )
 endmacro()
 
-install_gsa_binary(grape_engine)
-install_gsa_binary(gs_proto)
-install_gsa_binary(gs_util)
-
 if (ENABLE_JAVA_SDK)
     install_gsa_binary(graphx_runner)
 endif()
@@ -629,9 +580,5 @@ configure_file(graphscope-analytical-config-version.in.cmake
 )
 install(FILES "${PROJECT_BINARY_DIR}/graphscope-analytical-config.cmake"
         "${PROJECT_BINARY_DIR}/graphscope-analytical-config-version.cmake"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/graphscope-analytical
-)
-install(EXPORT graphscope-analytical-targets
-        FILE graphscope-analytical-targets.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/graphscope-analytical
 )

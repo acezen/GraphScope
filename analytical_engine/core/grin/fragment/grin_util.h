@@ -50,16 +50,16 @@ namespace grin_util {
 
 // A wrapper for GRIN_VERTEX
 struct Vertex {
-  Vertex(uint64_t a) noexcept : g_(GRIN_NULL_GRAPH), grin_v(GRIN_NULL_VERTEX) {}  // compatible with grape
-  Vertex() noexcept : g_(GRIN_NULL_GRAPH), grin_v(GRIN_NULL_VERTEX) {}
+  Vertex(uint64_t a) noexcept : g_(GRIN_NULL_GRAPH),  grin_v(GRIN_NULL_VERTEX) {}  // compatible with grape
+  Vertex() noexcept : g_(GRIN_NULL_GRAPH),  grin_v(GRIN_NULL_VERTEX) {}
   explicit Vertex(GRIN_GRAPH g, GRIN_VERTEX v) noexcept : g_(g), grin_v(v) {}
   inline Vertex& operator=(Vertex&& rhs) noexcept {
     g_ = rhs.g_;
     grin_v = rhs.grin_v;
-    rhs.grin_v = GRIN_NULL_VERTEX;
+    // rhs.grin_v = GRIN_NULL_VERTEX;
     return *this;
   }
-  Vertex(const Vertex& rhs) : g_(rhs.g_), grin_v(rhs.grin_v) {
+  Vertex(const Vertex& rhs) : g_(rhs.g_),  grin_v(rhs.grin_v) {
     /*
     grin_v = rhs.grin_v;
     auto v_ref = grin_get_vertex_ref_by_vertex(g_, rhs.grin_v);
@@ -82,8 +82,43 @@ struct Vertex {
     return *this;
   }
   ~Vertex() {
-    grin_destroy_vertex(g_, grin_v);
+    // grin_destroy_vertex(g_, grin_v);
   }
+
+  inline Vertex& operator++() noexcept {
+    grin_v++;
+    return *this;
+  }
+
+  inline Vertex operator++(int) noexcept {
+    Vertex res(*this);
+    grin_v++;
+    return res;
+  }
+
+  inline Vertex& operator--() noexcept {
+    grin_v--;
+    return *this;
+  }
+
+  inline Vertex operator--(int) noexcept {
+    Vertex res(*this);
+    grin_v--; 
+    return res;
+  }
+
+  inline Vertex operator+(size_t offset) const noexcept {
+    return Vertex(g_, grin_v + offset);
+  }
+  
+  inline bool operator==(const Vertex& rhs) const {
+    return grin_v == rhs.grin_v; 
+  }
+
+  inline bool operator!=(const Vertex& rhs) const {
+    return grin_v != rhs.grin_v;
+  }
+
   inline bool operator<(const Vertex& rhs) const {
     return grin_v < rhs.grin_v;
   }
@@ -119,21 +154,22 @@ class VertexRange {
   }
 
   class iterator {
-    using reference_type = Vertex;
+    using reference_type = Vertex&;
 
    private:
     GRIN_GRAPH g_;
     GRIN_VERTEX_LIST vl_;
-    size_t cur_;
+    Vertex cur_;
 
    public:
     iterator() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), cur_(0) {}
-    explicit iterator(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, size_t idx) noexcept : g_(g), vl_(vl), cur_(idx) {}
+    explicit iterator(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, size_t idx) noexcept : g_(g), vl_(vl), cur_(g, grin_get_vertex_from_list(g, vl, idx)) {}
     iterator(const iterator& rhs) = default;
     inline iterator& operator=(const iterator& rhs) = default;
     ~iterator() = default;
     reference_type operator*() noexcept {
-      return Vertex(g_, grin_get_vertex_from_list(g_, vl_, cur_));
+      // return Vertex(g_, grin_get_vertex_from_list(g_, vl_, cur_));
+      return cur_;
     }
 
     inline iterator& operator++() noexcept {
@@ -142,7 +178,9 @@ class VertexRange {
     }
 
     inline iterator operator++(int) noexcept {
-      return iterator(g_, vl_, cur_ + 1);
+      iterator ret = *this;
+      ++*this;
+      return ret;
     }
 
     inline iterator& operator--() noexcept {
@@ -151,11 +189,13 @@ class VertexRange {
     }
 
     inline iterator operator--(int) noexcept {
-      return iterator(g_, vl_, cur_--);
+      iterator ret = *this;
+      --*this;
+      return ret;
     }
 
     inline iterator operator+(size_t offset) const noexcept {
-      return iterator(g_, vl_, cur_ + offset);
+      return iterator(g_, vl_, cur_.grin_v + offset);
     }
 
     inline bool operator==(const iterator& rhs) const noexcept {
