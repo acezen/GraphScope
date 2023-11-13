@@ -110,6 +110,7 @@ class GRINProjectedFragment {
     fid_ = grin_get_partition_id(pg_, partition_);
     fnum_ = grin_get_total_partitions_number(pg_);
     g_ = grin_get_local_graph_by_partition(partitioned_graph, partition);
+    directed_ = grin_is_directed(g_);
     tvnum_ = ivnum_ = ovnum_ = 0;
     vt_ = grin_get_vertex_type_by_name(g_, v_label.c_str());
     et_ = grin_get_edge_type_by_name(g_, e_label.c_str());
