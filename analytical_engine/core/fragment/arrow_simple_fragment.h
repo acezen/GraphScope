@@ -330,7 +330,7 @@ class WrapAdjList {
   explicit WrapAdjList(const adj_list_t& adj_list,
                        size_t begin, size_t end, const prop_id_t& prop_id)
       : adj_list_(adj_list),
-        begin_(begin), end_(end), prop_id_(prop_id),{}
+        begin_(begin), end_(end), prop_id_(prop_id) {}
 
   NbrDefault<VID_T, EID_T, EDATA_T> begin() const {
     return NbrDefault<VID_T, EID_T, EDATA_T>(adj_list_.begin(), begin_, prop_id_);
