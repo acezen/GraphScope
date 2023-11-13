@@ -453,6 +453,7 @@ if (BUILD_GRIN)
     message(STATUS ${VINEYARD_INCLUDE_DIRS})
     # add_grin_vineyard_app(run_gart_test SRCS core/grin/test/run_gart_test.cc)
     add_grin_vineyard_app(run_grin_app SRCS core/grin/test/run_grin_app.cc)
+    add_grin_vineyard_app(run_wcc SRCS core/grin/test/wcc.cc)
 endif ()
 
 # Cpplint
