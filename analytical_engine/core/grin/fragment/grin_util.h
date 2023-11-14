@@ -151,9 +151,7 @@ class VertexRange {
     }
 
     inline iterator operator++(int) noexcept {
-      iterator ret = *this;
-      ++*this;
-      return ret;
+      return iterator(g_, vl_, cur_ + 1);
     }
 
     inline iterator& operator--() noexcept {
@@ -162,9 +160,7 @@ class VertexRange {
     }
 
     inline iterator operator--(int) noexcept {
-      iterator ret = *this;
-      --*this;
-      return ret;
+      return iterator(g_, vl_, cur_--);
     }
 
     inline iterator operator+(size_t offset) const noexcept {
@@ -325,6 +321,7 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
     Base::clear();
     Base::resize(range.size(), value);
     range_ = range;
+    fake_start_ = Base::data();
   }
 
   void SetValue(VertexRange& range, const T& value) {
