@@ -151,7 +151,9 @@ class VertexRange {
     }
 
     inline iterator operator++(int) noexcept {
-      return iterator(g_, vl_, cur_ + 1);
+      iterator ret = *this;
+      ++*this;
+      return ret;
     }
 
     inline iterator& operator--() noexcept {
@@ -160,7 +162,9 @@ class VertexRange {
     }
 
     inline iterator operator--(int) noexcept {
-      return iterator(g_, vl_, cur_--);
+      iterator ret = *this;
+      --*this;
+      return ret;
     }
 
     inline iterator operator+(size_t offset) const noexcept {
