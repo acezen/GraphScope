@@ -251,17 +251,18 @@ class VertexRange {
 #else
 class VertexRange { // TODO(wanglei): add vtype as member
  public:
-  VertexRange() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), size_(0) {}
-  VertexRange(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, size_t size)
-      : g_(g), vl_(vl), size_(size) {}
+  VertexRange() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), vt_(GRIN_NULL_VERTEX_TYPE), size_(0) {}
+  VertexRange(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, GRIN_VERTEX_TYPE vt, size_t size)
+      : g_(g), vl_(vl), vt_(vt), size_(size) {}
 
-  VertexRange(const VertexRange& r) : g_(r.g_), vl_(r.vl_), size_(r.size_) {}
+  VertexRange(const VertexRange& r) : g_(r.g_), vl_(r.vl_), vt_(r.vt_), size_(r.size_) {}
 
   ~VertexRange() = default;
 
   inline VertexRange& operator=(const VertexRange& r) {
     g_ = r.g_;
     vl_ = r.vl_;
+    vt_ = r.vt_;
     size_ = r.size_;
     return *this;
   }
@@ -310,6 +311,7 @@ class VertexRange { // TODO(wanglei): add vtype as member
 
   void Swap(VertexRange& rhs) {
     std::swap(vl_, rhs.vl_);
+    std::swap(vt_, rhs.vt_);
     std::swap(size_, rhs.size_);
   }
 
@@ -318,13 +320,13 @@ class VertexRange { // TODO(wanglei): add vtype as member
   const size_t end_value() const { return size_; }
 
   int64_t GetVertexLoc(const Vertex& v) const {
-    auto vt = grin_get_vertex_type(g_, v.grin_v);
-    return grin_get_vertex_internal_id_by_type(g_, vt, v.grin_v);
+    return grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
   }
 
  private:
   GRIN_GRAPH g_;
   GRIN_VERTEX_LIST vl_;
+  GRIN_VERTEX_TYPE vt_;
   size_t size_;
 };
 #endif
@@ -367,7 +369,6 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
   void SetValue(const Vertex& loc, const T& value) {
     auto internal_id = range_.GetVertexLoc(loc);
     fake_start_[internal_id] = value;
-    // fake_start_[loc.grin_v] = value;
   }
 
   void SetValue(const T& value) {
@@ -377,12 +378,10 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
   inline T& operator[](const Vertex& loc) {
     auto internal_id = range_.GetVertexLoc(loc);
     return fake_start_[internal_id];
-    // return fake_start_[loc.grin_v];
   }
   inline const T& operator[](const Vertex& loc) const {
     auto internal_id = range_.GetVertexLoc(loc);
     return fake_start_[internal_id];
-    // return fake_start_[loc.grin_v];
   }
 
   void Swap(VertexArray& rhs) {
@@ -567,14 +566,14 @@ template <typename T>
 struct Nbr {
  public:
   Nbr() : g_(GRIN_NULL_GRAPH), al_(GRIN_NULL_ADJACENT_LIST), cur_(GRIN_NULL_ADJACENT_LIST_ITERATOR) {}
-  Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, GRIN_ADJACENT_LIST_ITERATOR cur, const char* default_prop_name)
-    : g_{g}, al_(al), cur_(cur), default_prop_name_(default_prop_name) {}
+  Nbr(GRIN_GRAPH g, GRIN_ADJACENT_LIST al, GRIN_ADJACENT_LIST_ITERATOR cur, GRIN_EDGE_PROPERTY ep)
+    : g_{g}, al_(al), cur_(cur), ep_(ep) {}
   Nbr(const Nbr& rhs) = delete;
   Nbr(Nbr&& rhs) {  // move constructor
     g_ = rhs.g_;
     al_ = rhs.al_;
     cur_ = rhs.cur_;
-    default_prop_name_ = rhs.default_prop_name_;
+    ep_ = rhs.ep_;
     rhs.cur_ = GRIN_NULL_ADJACENT_LIST_ITERATOR;
   }
   // Nbr(Nbr& rhs) : g_{rhs.g_}, al_(rhs.al_), cur_(rhs.cur_), default_prop_name_(rhs.default_prop_name_)  {}
@@ -592,8 +591,8 @@ struct Nbr {
     g_ = rhs.g_;
     al_ = rhs.al_;
     cur_ = rhs.cur_;
-    default_prop_name_ = rhs.default_prop_name_;
-    rhs.cur_ = nullptr;
+    ep_ = rhs.ep_;
+    rhs.cur_ = GRIN_NULL_ADJACENT_LIST_ITERATOR;
     return *this;
   }
 
@@ -632,7 +631,7 @@ struct Nbr {
   GRIN_GRAPH g_;
   GRIN_ADJACENT_LIST al_;
   GRIN_ADJACENT_LIST_ITERATOR cur_;
-  const char* default_prop_name_;
+  GRIN_EDGE_PROPERTY ep_;;
 };
 #endif
 
@@ -682,20 +681,18 @@ class AdjList {
   using nbr_t = Nbr<T>;
 
  public:
-  AdjList(): g_(GRIN_NULL_GRAPH), adj_list_(GRIN_NULL_ADJACENT_LIST) {}
-  AdjList(GRIN_GRAPH g, GRIN_ADJACENT_LIST adj_list, const char* prop_name)
-    : g_{g}, adj_list_(adj_list), prop_name_(prop_name) {}
+  AdjList(): g_(GRIN_NULL_GRAPH), adj_list_(GRIN_NULL_ADJACENT_LIST), ep_(GRIN_NULL_EDGE_PROPERTY) {}
+  AdjList(GRIN_GRAPH g, GRIN_ADJACENT_LIST adj_list, GRIN_EDGE_PROPERTY ep)
+    : g_{g}, adj_list_(adj_list), ep_(ep) {}
   AdjList(const AdjList&) = delete;  // disable copy constructor
   void operator=(const AdjList&) = delete;  // disable copy assignment
   AdjList(AdjList&& rhs) = delete;  // disable move constructor
 
-  ~AdjList() {
-    grin_destroy_adjacent_list(g_, adj_list_);
-  }
+  ~AdjList() =default;
 
   inline nbr_t begin() const {
     auto iter = grin_get_adjacent_list_begin(g_, adj_list_);
-    return nbr_t(g_, adj_list_, iter, prop_name_);
+    return nbr_t(g_, adj_list_, iter, ep_);
   }
 
   inline bool IsEnd(const nbr_t& iter) {
@@ -705,7 +702,7 @@ class AdjList {
  private:
   GRIN_GRAPH g_;
   GRIN_ADJACENT_LIST adj_list_;
-  const char* prop_name_;
+  GRIN_EDGE_PROPERTY ep_;
 };
 #endif
 } // namespace grin_util
