@@ -33,7 +33,7 @@
 #include "apps/projected/sssp_projected.h"
 #include "apps/projected/wcc_projected.h"
 
-// #include "core/fragment/arrow_flattened_fragment.h"
+#include "core/fragment/arrow_flattened_fragment.h"
 #include "core/fragment/arrow_projected_fragment.h"
 #include "core/fragment/arrow_simple_fragment.h"
 #include "core/loader/arrow_fragment_loader.h"
@@ -56,10 +56,16 @@ using ProjectedFragmentType =
 using SimpleFragmentType =
     gs::ArrowSimpleFragment<oid_t, vid_t, double,
                                int64_t>;
+
+using FlattenFragmentType =
+    gs::ArrowFlattenedFragment<oid_t, vid_t, double, int64_t>;
+
+
 template <typename FRAG_T>
 void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
                     const grape::CommSpec& comm_spec,
-                    const std::string& out_prefix) {
+                    const std::string& out_prefix,
+		    std::string& output_result) {
   using AppType = gs::PageRankNetworkX<FRAG_T>;
   auto app = std::make_shared<AppType>();
   auto worker = AppType::CreateWorker(app, fragment);
@@ -80,14 +86,15 @@ void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
     LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << "seconds";
   }
 
+  if (output_result == "true") {
+    std::ofstream ostream;
+    std::string output_path =
+        grape::GetResultFilename(out_prefix, fragment->fid());
 
-  std::ofstream ostream;
-  std::string output_path =
-      grape::GetResultFilename(out_prefix, fragment->fid());
-
-  ostream.open(output_path);
-  worker->Output(ostream);
-  ostream.close();
+    ostream.open(output_path);
+    worker->Output(ostream);
+    ostream.close();
+  }
 
   worker->Finalize();
 }
@@ -95,7 +102,8 @@ void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
 template <typename FRAG_T>
 void RunSSSP(std::shared_ptr<FRAG_T> fragment,
                     const grape::CommSpec& comm_spec,
-                    const std::string& out_prefix) {
+                    const std::string& out_prefix,
+		    std::string& output_result) {
   // using AppType = grape::SSSP<FRAG_T>;
   using AppType = gs::SSSPProjected<FRAG_T>;
   auto app = std::make_shared<AppType>();
@@ -112,13 +120,15 @@ void RunSSSP(std::shared_ptr<FRAG_T> fragment,
     LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << "seconds";
   }
 
-  std::ofstream ostream;
-  std::string output_path =
-      grape::GetResultFilename(out_prefix, fragment->fid());
+  if (output_result == "true") {
+    std::ofstream ostream;
+    std::string output_path =
+        grape::GetResultFilename(out_prefix, fragment->fid());
 
-  ostream.open(output_path);
-  worker->Output(ostream);
-  ostream.close();
+    ostream.open(output_path);
+    worker->Output(ostream);
+    ostream.close();
+  }
 
   worker->Finalize();
 }
@@ -126,7 +136,8 @@ void RunSSSP(std::shared_ptr<FRAG_T> fragment,
 template <typename FRAG_T>
 void RunWCC(std::shared_ptr<FRAG_T> fragment,
                     const grape::CommSpec& comm_spec,
-                    const std::string& out_prefix) {
+                    const std::string& out_prefix,
+		    std::string& output_result) {
   // using AppType = grape::SSSP<FRAG_T>;
   using AppType = gs::WCCProjected<FRAG_T>;
   auto app = std::make_shared<AppType>();
@@ -143,15 +154,15 @@ void RunWCC(std::shared_ptr<FRAG_T> fragment,
     LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << "seconds";
   }
 
-  /*
-  std::ofstream ostream;
-  std::string output_path =
-      grape::GetResultFilename(out_prefix, fragment->fid());
+  if (output_result == "true") {
+    std::ofstream ostream;
+    std::string output_path =
+        grape::GetResultFilename(out_prefix, fragment->fid());
 
-  ostream.open(output_path);
-  worker->Output(ostream);
-  ostream.close();
-  */
+    ostream.open(output_path);
+    worker->Output(ostream);
+    ostream.close();
+  }
 
   worker->Finalize();
 }
@@ -159,7 +170,8 @@ void RunWCC(std::shared_ptr<FRAG_T> fragment,
 template <typename FRAG_T>
 void RunProjectedEigen(std::shared_ptr<FRAG_T> fragment,
                     const grape::CommSpec& comm_spec,
-                    const std::string& out_prefix) {
+                    const std::string& out_prefix,
+		    std::string& output_result) {
   // using AppType = grape::PageRankAuto<ProjectedFragmentType>;
   using AppType = gs::EigenvectorCentrality<FRAG_T>;
   // using AppType = grape::PageRankLocal<ProjectedFragmentType>;
@@ -170,13 +182,15 @@ void RunProjectedEigen(std::shared_ptr<FRAG_T> fragment,
 
   worker->Query(1e-6, 10);
 
-  std::ofstream ostream;
-  std::string output_path =
-      grape::GetResultFilename(out_prefix, fragment->fid());
-
-  ostream.open(output_path);
-  worker->Output(ostream);
-  ostream.close();
+  if (output_result == "true") {
+    std::ofstream ostream;
+    std::string output_path =
+       grape::GetResultFilename(out_prefix, fragment->fid());
+ 
+    ostream.open(output_path);
+    worker->Output(ostream);
+    ostream.close();
+  }
 
   worker->Finalize();
 }
@@ -222,20 +236,35 @@ std::shared_ptr<SimpleFragmentType> GetSimpleFragment(const std::string& ipc_soc
 }
 
 
+std::shared_ptr<FlattenFragmentType> GetFlattenFragment(const std::string& ipc_socket, vineyard::Client& client,
+         const grape::CommSpec& comm_spec,
+         vineyard::ObjectID fragment_group_id) {
+  LOG(INFO) << "Load as ARROW Flatten Fragment";
+  auto fg = std::dynamic_pointer_cast<vineyard::ArrowFragmentGroup>(
+      client.GetObject(fragment_group_id));
+  auto fid = comm_spec.WorkerToFrag(comm_spec.worker_id());
+  auto frag_id = fg->Fragments().at(fid);
+  auto arrow_frag = std::static_pointer_cast<FragmentType>(client.GetObject(frag_id));
+  // return std::make_shared<FlattenFragmentType>(arrow_frag.get(), 0, 0);
+  return FlattenFragmentType::Project(arrow_frag, "0", "0");
+}
+
+
 void RunGrin(const grape::CommSpec& comm_spec, int argc, char** argv) {
   int index = 2;
   std::string uri = std::string(argv[index++]);
   std::string app_name = std::string(argv[index++]);
+  std::string output_result = std::string(argv[index++]);
   auto frag = GetGrinFragment(comm_spec, uri);
 
   if (app_name == "pagerank") {
-    RunProjectedPR<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_pr");
+    RunProjectedPR<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_pr", output_result);
   } else if (app_name == "eigenvector") {
-    RunProjectedEigen<GRINProjectedFragmentType>(frag, comm_spec, "output_eigen");
+    RunProjectedEigen<GRINProjectedFragmentType>(frag, comm_spec, "output_eigen", output_result);
   } else if (app_name == "sssp") {
-    RunSSSP<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_sssp");
+    RunSSSP<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_sssp", output_result);
   } else if (app_name == "wcc") {
-    RunWCC<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_wcc");
+    RunWCC<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_wcc", output_result);
   } else {
     LOG(FATAL) << "Unknown app name: " << app_name;
   }
@@ -248,6 +277,7 @@ void RunNoGrin(const grape::CommSpec& comm_spec, int argc, char** argv) {
   int index = 2;
   std::string ipc_socket = std::string(argv[index++]);
   std::string app_name = std::string(argv[index++]);
+  std::string output_result = std::string(argv[index++]);
   vineyard::ObjectID fragment_id = vineyard::InvalidObjectID();
   fragment_id = atol(argv[index++]);
 
@@ -257,13 +287,13 @@ void RunNoGrin(const grape::CommSpec& comm_spec, int argc, char** argv) {
   auto frag = GetSimpleFragment(ipc_socket, client, comm_spec, fragment_id);
 
   if (app_name == "pagerank") {
-    RunProjectedPR<SimpleFragmentType>(frag, comm_spec, "/tmp/output_pr");
+    RunProjectedPR<SimpleFragmentType>(frag, comm_spec, "/tmp/output_pr", output_result);
   } else if (app_name == "eigenvector") {
-    RunProjectedEigen<SimpleFragmentType>(frag, comm_spec, "output_eigen");
+    RunProjectedEigen<SimpleFragmentType>(frag, comm_spec, "output_eigen", output_result);
   } else if (app_name == "sssp") {
-    RunSSSP<SimpleFragmentType>(frag, comm_spec, "/tmp/output_sssp");
+    RunSSSP<SimpleFragmentType>(frag, comm_spec, "/tmp/output_sssp", output_result);
   } else if (app_name == "wcc") {
-    RunWCC<SimpleFragmentType>(frag, comm_spec, "/tmp/output_wcc"); 
+    RunWCC<SimpleFragmentType>(frag, comm_spec, "/tmp/output_wcc", output_result); 
   } else {
     LOG(FATAL) << "Unknown app name: " << app_name;
   }
@@ -271,6 +301,31 @@ void RunNoGrin(const grape::CommSpec& comm_spec, int argc, char** argv) {
             << vineyard::get_rss_pretty()
             << ", peak = " << vineyard::get_peak_rss_pretty();
 }
+
+
+void RunFlatten(const grape::CommSpec& comm_spec, int argc, char** argv) {
+  int index = 2;
+  std::string ipc_socket = std::string(argv[index++]);
+  std::string app_name = std::string(argv[index++]);
+  std::string output_result = std::string(argv[index++]);
+  vineyard::ObjectID fragment_id = vineyard::InvalidObjectID();
+  fragment_id = atol(argv[index++]);
+
+  vineyard::Client client;
+  VINEYARD_CHECK_OK(client.Connect(ipc_socket));
+
+  auto frag = GetFlattenFragment(ipc_socket, client, comm_spec, fragment_id);
+
+  if (app_name == "wcc") {
+    RunWCC<FlattenFragmentType>(frag, comm_spec, "/tmp/output_wcc", output_result); 
+  } else {
+    LOG(FATAL) << "Unknown app name: " << app_name;
+  }
+  LOG(INFO) << "finish running application ... memory = "
+            << vineyard::get_rss_pretty()
+            << ", peak = " << vineyard::get_peak_rss_pretty();
+}
+
 
 void LoadGraphToVineyard(int argc, char** argv) {
   LOG(INFO) << "Loading Graph To Vineyard.";
@@ -347,6 +402,8 @@ void RunApp(int argc, char** argv) {
       RunGrin(comm_spec, argc, argv);
     } else if (cmd_type == "run_arrow") {
       RunNoGrin(comm_spec, argc, argv);
+    } else if (cmd_type == "run_flatten") {
+      RunFlatten(comm_spec, argc, argv);
     }
 
     MPI_Barrier(comm_spec.comm());
@@ -383,3 +440,4 @@ template class gs::ArrowProjectedFragment<int64_t, uint64_t, double,
                                int64_t>;
 template class gs::ArrowSimpleFragment<int64_t, uint64_t, double,
                                int64_t>;
+template class gs::ArrowFlattenedFragment<int64_t, uint64_t, double, int64_t>;

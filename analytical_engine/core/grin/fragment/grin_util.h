@@ -50,13 +50,13 @@ namespace grin_util {
 
 // A wrapper for GRIN_VERTEX
 struct Vertex {
-  Vertex(uint64_t a) noexcept : g_(GRIN_NULL_GRAPH),  grin_v(GRIN_NULL_VERTEX) {}  // compatible with grape
+  Vertex(uint64_t a) noexcept : g_(GRIN_NULL_GRAPH), grin_v(GRIN_NULL_VERTEX) {}  // compatible with grape
   Vertex() noexcept : g_(GRIN_NULL_GRAPH),  grin_v(GRIN_NULL_VERTEX) {}
   explicit Vertex(GRIN_GRAPH g, GRIN_VERTEX v) noexcept : g_(g), grin_v(v) {}
   inline Vertex& operator=(Vertex&& rhs) noexcept {
     g_ = rhs.g_;
     grin_v = rhs.grin_v;
-    // rhs.grin_v = GRIN_NULL_VERTEX;
+    rhs.grin_v = GRIN_NULL_VERTEX;
     return *this;
   }
   Vertex(const Vertex& rhs) : g_(rhs.g_),  grin_v(rhs.grin_v) {
@@ -82,9 +82,9 @@ struct Vertex {
     return *this;
   }
   ~Vertex() {
-    // grin_destroy_vertex(g_, grin_v);
+    grin_destroy_vertex(g_, grin_v);
   }
-
+/*
   inline Vertex& operator++() noexcept {
     grin_v++;
     return *this;
@@ -118,7 +118,7 @@ struct Vertex {
   inline bool operator!=(const Vertex& rhs) const {
     return grin_v != rhs.grin_v;
   }
-
+*/
   inline bool operator<(const Vertex& rhs) const {
     return grin_v < rhs.grin_v;
   }
@@ -159,16 +159,19 @@ class VertexRange {
    private:
     GRIN_GRAPH g_;
     GRIN_VERTEX_LIST vl_;
-    Vertex cur_;
+    // Vertex cur_;
+    size_t cur_;
 
    public:
     iterator() noexcept : g_(GRIN_NULL_GRAPH), vl_(GRIN_NULL_VERTEX_LIST), cur_(0) {}
-    explicit iterator(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, size_t idx) noexcept : g_(g), vl_(vl), cur_(g, grin_get_vertex_from_list(g, vl, idx)) {}
+    // explicit iterator(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, size_t idx) noexcept : g_(g), vl_(vl), cur_(g, grin_get_vertex_from_list(g, vl, idx)) {}
+    explicit iterator(GRIN_GRAPH g, GRIN_VERTEX_LIST vl, size_t idx) noexcept : g_(g), vl_(vl), cur_(idx) {}
     iterator(const iterator& rhs) = default;
     inline iterator& operator=(const iterator& rhs) = default;
     ~iterator() = default;
     reference_type operator*() noexcept {
-      return Vertex(cur_);
+      // return Vertex(cur_);
+      return Vertex(g_, grin_get_vertex_from_list(g_, vl_, cur_));
     }
 
     inline iterator& operator++() noexcept {
@@ -177,9 +180,10 @@ class VertexRange {
     }
 
     inline iterator operator++(int) noexcept {
-      iterator ret = *this;
-      ++*this;
-      return ret;
+      return iterator(g_, vl_, cur_ + 1);
+      // iterator ret = *this;
+      // ++*this;
+      // return ret;
     }
 
     inline iterator& operator--() noexcept {
@@ -188,13 +192,15 @@ class VertexRange {
     }
 
     inline iterator operator--(int) noexcept {
-      iterator ret = *this;
-      --*this;
-      return ret;
+      // iterator ret = *this;
+      // --*this;
+      // return ret;
+      return iterator(g_, vl_, cur_--);
     }
 
     inline iterator operator+(size_t offset) const noexcept {
-      return iterator(g_, vl_, cur_.grin_v + offset);
+      // return iterator(g_, vl_, cur_.grin_v + offset);
+      return iterator(g_, vl_, cur_ + offset);
     }
 
     inline bool operator==(const iterator& rhs) const noexcept {
@@ -359,8 +365,9 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
                 range.size(), value);
   }
   void SetValue(const Vertex& loc, const T& value) {
-    // auto internal_id = range_.GetVertexLoc(loc);
-    fake_start_[loc.grin_v] = value;
+    auto internal_id = range_.GetVertexLoc(loc);
+    fake_start_[internal_id] = value;
+    // fake_start_[loc.grin_v] = value;
   }
 
   void SetValue(const T& value) {
@@ -368,12 +375,14 @@ class VertexArray : public grape::Array<T, grape::Allocator<T>> {
   }
 
   inline T& operator[](const Vertex& loc) {
-    // auto internal_id = range_.GetVertexLoc(loc);
-    return fake_start_[loc.grin_v];
+    auto internal_id = range_.GetVertexLoc(loc);
+    return fake_start_[internal_id];
+    // return fake_start_[loc.grin_v];
   }
   inline const T& operator[](const Vertex& loc) const {
-    // auto internal_id = range_.GetVertexLoc(loc);
-    return fake_start_[loc.grin_v];
+    auto internal_id = range_.GetVertexLoc(loc);
+    return fake_start_[internal_id];
+    // return fake_start_[loc.grin_v];
   }
 
   void Swap(VertexArray& rhs) {

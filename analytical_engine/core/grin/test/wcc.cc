@@ -169,7 +169,7 @@ void wcc_iter(GRIN_GRAPH g, const char* vertex_type_name, const char* edge_type_
   GRIN_VERTEX_LIST iv = grin_get_vertex_list_by_type_select_master(g, vt);
   GRIN_VERTEX_LIST_ITERATOR iv_iter = grin_get_vertex_list_begin(g, iv);
 
-  while (grin_is_vertex_list_end(g, iv_iter)) {
+  while (!grin_is_vertex_list_end(g, iv_iter)) {
     GRIN_VERTEX v = grin_get_vertex_from_iter(g, iv_iter);
     GRIN_VERTEX_REF vf = grin_get_vertex_ref_by_vertex(g, v);
     long long int ivf = grin_serialize_vertex_ref_as_int64(g, vf);
@@ -191,14 +191,14 @@ void wcc_iter(GRIN_GRAPH g, const char* vertex_type_name, const char* edge_type_
 
   iv_iter = grin_get_vertex_list_begin(g, iv);
 
-  while (grin_is_vertex_list_end(g, iv_iter)) {
+  while (!grin_is_vertex_list_end(g, iv_iter)) {
     GRIN_VERTEX v = grin_get_vertex_from_iter(g, iv_iter);
     long long cid = comp[v];
 
     GRIN_ADJACENT_LIST al = grin_get_adjacent_list_by_edge_type(g, OUT, v, et);
     GRIN_ADJACENT_LIST_ITERATOR al_iter = grin_get_adjacent_list_begin(g, al);
 
-    while (grin_is_adjacent_list_end(g, al_iter)) {
+    while (!grin_is_adjacent_list_end(g, al_iter)) {
       GRIN_VERTEX u = grin_get_neighbor_from_adjacent_list_iter(g, al_iter);
       if (comp[u] > cid) {
         comp[u] = cid;
@@ -214,7 +214,7 @@ void wcc_iter(GRIN_GRAPH g, const char* vertex_type_name, const char* edge_type_
     al = grin_get_adjacent_list_by_edge_type(g, IN, v, et);
     al_iter = grin_get_adjacent_list_begin(g, al);
 
-    while (grin_is_adjacent_list_end(g, al_iter)) {
+    while (!grin_is_adjacent_list_end(g, al_iter)) {
       GRIN_VERTEX u = grin_get_neighbor_from_adjacent_list_iter(g, al_iter);
       if (comp[u] > cid) {
         comp[u] = cid;
@@ -247,9 +247,9 @@ void wcc_iter(GRIN_GRAPH g, const char* vertex_type_name, const char* edge_type_
 int main(int argc, char** argv) {
   GRIN_GRAPH g = get_graph(argc, argv, 0);
 
-  //wcc(g, "person", "knows");
+  wcc(g, "person", "knows");
 
-  wcc_iter(g, "person", "knows");
+  // wcc_iter(g, "person", "knows");
 
   grin_destroy_graph(g);
   return 0;

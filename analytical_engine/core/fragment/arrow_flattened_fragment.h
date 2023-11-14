@@ -580,9 +580,10 @@ class ArrowFlattenedFragment {
 
   ArrowFlattenedFragment() = default;
 
-  explicit ArrowFlattenedFragment(fragment_t* frag, prop_id_t v_prop_id,
+  explicit ArrowFlattenedFragment(std::shared_ptr<fragment_t> frag_copy, fragment_t* frag, prop_id_t v_prop_id,
                                   prop_id_t e_prop_id)
-      : fragment_(frag),
+      : fragment_copy_(frag_copy),
+	fragment_(frag),
         schema_(fragment_->schema()),
         v_prop_id_(v_prop_id),
         e_prop_id_(e_prop_id) {
@@ -637,11 +638,11 @@ class ArrowFlattenedFragment {
 
   static std::shared_ptr<
       ArrowFlattenedFragment<OID_T, VID_T, VDATA_T, EDATA_T, VERTEX_MAP_T>>
-  Project(const std::shared_ptr<fragment_t>& frag, const std::string& v_prop,
+  Project(const std::shared_ptr<fragment_t> frag, const std::string& v_prop,
           const std::string& e_prop) {
     prop_id_t v_prop_id = boost::lexical_cast<int>(v_prop);
     prop_id_t e_prop_id = boost::lexical_cast<int>(e_prop);
-    return std::make_shared<ArrowFlattenedFragment>(frag.get(), v_prop_id,
+    return std::make_shared<ArrowFlattenedFragment>(frag, frag.get(), v_prop_id,
                                                     e_prop_id);
   }
 
@@ -954,6 +955,7 @@ class ArrowFlattenedFragment {
 
  private:
   fragment_t* fragment_;
+  std::shared_ptr<fragment_t> fragment_copy_;
   const vineyard::PropertyGraphSchema& schema_;
   prop_id_t v_prop_id_;
   prop_id_t e_prop_id_;

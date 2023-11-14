@@ -73,6 +73,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
 
   void PEval(const fragment_t& frag, context_t& ctx,
              message_manager_t& messages) {
+	  /*
     auto inner_vertices = frag.InnerVertices();
     auto outer_vertices = frag.OuterVertices();
     auto vertices = frag.Vertices();
@@ -110,12 +111,12 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
     dummy = 0;
     start = grape::GetCurrentTime();
     for (auto v : inner_vertices) {
-      auto es = frag.WrapGetOutgoingAdjList(v);
+      auto es = frag.GetOutgoingAdjList(v);
       for (auto& e : es) {
         dummy++;
       }
 
-      auto es2 = frag.WrapGetIncomingAdjList(v);
+      auto es2 = frag.GetIncomingAdjList(v);
       if (frag.directed()) {
         for (auto& e : es2) {
           dummy++;
@@ -129,7 +130,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
     for (auto v : inner_vertices) {
       auto cid = ctx.comp_id[v];
 
-      auto es = frag.WrapGetOutgoingAdjList(v);
+      auto es = frag.GetOutgoingAdjList(v);
       for (auto& e : es) {
         auto u = e.get_neighbor();
         if (ctx.comp_id[u] > cid) {
@@ -138,7 +139,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
         }
       }
 
-      auto es2 = frag.WrapGetIncomingAdjList(v);
+      auto es2 = frag.GetIncomingAdjList(v);
       if (frag.directed()) {
         for (auto& e : es2) {
           auto u = e.get_neighbor();
@@ -150,7 +151,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
       }
     }
     LOG(INFO) << "6. traverse vertex + edge + get_neighbor + ctx.comp_id[u]" << grape::GetCurrentTime() - start << "seconds";
-    /*
+    */
     double start = grape::GetCurrentTime();
 
     auto inner_vertices = frag.InnerVertices();
@@ -173,7 +174,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
       auto cid = ctx.comp_id[v];
       // LOG(INFO) << "v-" << frag.GetInnerVertexGid(v);;
 
-      auto es = frag.WrapGetOutgoingAdjList(v);
+      auto es = frag.GetOutgoingAdjList(v);
       for (auto& e : es) {
 	auto u = e.get_neighbor();
 	// LOG(INFO) << frag.GetInnerVertexGid(v) << "(" << cid << ")" << " -> " << frag.GetInnerVertexGid(u) << "(" << ctx.comp_id[u] << ")";
@@ -183,7 +184,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
         }
       }
 
-      auto es2 = frag.WrapGetIncomingAdjList(v);
+      auto es2 = frag.GetIncomingAdjList(v);
       if (frag.directed()) {
         // es = frag.GetIncomingAdjList(v);
         for (auto& e : es2) {
@@ -217,7 +218,6 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
     // LOG(INFO) << "next modified count = " << count;
     ctx.next_modified.Swap(ctx.curr_modified);
     LOG(INFO) << "--------- 4 -----------: " << grape::GetCurrentTime() - start << "seconds";
-    */
   }
 
   void IncEval(const fragment_t& frag, context_t& ctx,
@@ -250,7 +250,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
       ctx.curr_modified[v] = false;
       auto cid = ctx.comp_id[v];
 
-      auto es = frag.WrapGetOutgoingAdjList(v);
+      auto es = frag.GetOutgoingAdjList(v);
       for (auto& e : es) {
         auto u = e.get_neighbor();
         if (ctx.comp_id[u] > cid) {
@@ -259,7 +259,7 @@ class WCCProjected : public AppBase<FRAG_T, WCCProjectedContext<FRAG_T>> {
         }
       }
 
-      auto es2 = frag.WrapGetIncomingAdjList(v);
+      auto es2 = frag.GetIncomingAdjList(v);
       if (frag.directed()) {
         // es = frag.GetIncomingAdjList(v);
         for (auto& e : es2) {
