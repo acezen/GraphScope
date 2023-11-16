@@ -21,14 +21,11 @@ limitations under the License.
 #include "grape/grape.h"
 
 namespace gs {
-/**
- * @brief Context for the Networkx version of PageRank.
- *
- * @tparam FRAG_T
- */
+
 template <typename FRAG_T>
 class PageRankGartContext
     : public grape::VertexDataContext<FRAG_T, double> {
+
   using oid_t = typename FRAG_T::oid_t;
   using vertex_t = typename FRAG_T::vertex_t;
 
@@ -37,21 +34,21 @@ class PageRankGartContext
       : grape::VertexDataContext<FRAG_T, double>(fragment, true),
         result(this->data()) {}
 
-  void Init(grape::ParallelMessageManager& messages, double delta_input,
-            int max_round_input) {
-    // LOG(INFO) << "Init context.";
+  void Init(grape::DefaultMessageManager& messages, double alpha,
+            int max_round, double tolerance) {
     auto& frag = this->fragment();
     auto inner_vertices = frag.InnerVertices();
     auto vertices = frag.Vertices();
 
-    this->delta = delta_input;
-    this->max_round = max_round_input;
-    this->current_round = 0;
-    this->total_vertex_num = 0;
+    this->alpha = alpha;
+    this->max_round = max_round;
+    this->tolerance = tolerance;
 
     degree.Init(inner_vertices, 0);
     result.SetValue(0.0);
-    result_next.Init(vertices, 0.0);
+    pre_result.Init(vertices, 0.0);
+
+    step = 0;
   }
 
   void Output(std::ostream& os) override {
@@ -66,17 +63,19 @@ class PageRankGartContext
     }
   }
 
-  typename FRAG_T::template inner_vertex_array_t<int> degree;
+  typename FRAG_T::template inner_vertex_array_t<double> degree;
   typename FRAG_T::template vertex_array_t<double>& result;
-  typename FRAG_T::template vertex_array_t<double> result_next;
+  typename FRAG_T::template vertex_array_t<double> pre_result;
 
-  int max_round;
-  double delta;
-  int current_round;
-  int total_vertex_num;
+  uint64_t dangling_vnum = 0;
+  int step = 0;
+  int max_round = 0;
+  double alpha = 0;
+  double tolerance;
+
   double dangling_sum = 0.0;
-  int total_dangling_vnum = 0;
+  size_t graph_vnum = 0;
 };
 }  // namespace gs
 
-#endif  // ANALYTICAL_ENGINE_APPS_PAGERANK_PAGERANK_NETWORKX_CONTEXT_H_
+#endif  // ANALYTICAL_ENGINE_APPS_PAGERANK_PAGERANK_GART_CONTEXT_H_

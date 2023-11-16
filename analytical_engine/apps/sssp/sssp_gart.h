@@ -57,6 +57,8 @@ class SSSPGart
   void PEval(const fragment_t& frag, context_t& ctx,
              message_manager_t& messages) {
     LOG(INFO) << "PEval";
+
+    ctx.step = 0;
     vertex_t source(0);
     // bool native_source = false;
     // if (frag.fid() == 1) {
@@ -64,7 +66,7 @@ class SSSPGart
     // }
     bool native_source = frag.GetVertex(ctx.source_id, source);
     if (native_source && frag.IsInnerVertex(source)) {
-      LOG(INFO) << "native source" << frag.fid() << " " << frag.GetId(source);
+      LOG(INFO) << "native source " << frag.fid() << " " << frag.GetId(source);
       native_source = true;
     } else {
       native_source = false;
@@ -108,7 +110,9 @@ class SSSPGart
 
   void IncEval(const fragment_t& frag, context_t& ctx,
                message_manager_t& messages) {
-    LOG(INFO) << "IncEval";
+    ctx.step++;
+    LOG(INFO) << "IncEval-" << ctx.step;
+
     auto inner_vertices = frag.InnerVertices();
 
     std::priority_queue<std::pair<double, vertex_t>> heap;
@@ -157,7 +161,6 @@ class SSSPGart
   // sequential Dijkstra algorithm for SSSP.
   void Dijkstra(const fragment_t& frag, context_t& ctx,
                 std::priority_queue<std::pair<double, vertex_t>>& heap) {
-    LOG(INFO) << "Dijkstra";
     double distu, distv, ndistv;
     vertex_t v, u;
 

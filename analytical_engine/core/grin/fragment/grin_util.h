@@ -23,8 +23,8 @@
 #include <vector>
 
 #include "vineyard/common/util/static_if.h"
-#include "vineyard/graph/grin/predefine.h"
-// #include "interfaces/grin/predefine.h"
+// #include "vineyard/graph/grin/predefine.h"
+#include "grin/predefine.h"
 
 #include "grin/topology/structure.h"
 #include "grin/topology/vertexlist.h"
@@ -608,14 +608,26 @@ struct Nbr {
     return grin_get_edge_from_adjacent_list_iter(g_, cur_);
   }
 
-  T get_data() const {
-    /*
+  int get_data() const {
     auto _e = grin_get_edge_from_adjacent_list_iter(g_, cur_);
-    auto type = grin_get_edge_type(g_, _e);
-    auto prop = grin_get_edge_property_by_name(g_, type, default_prop_name_);
-    return grin_get_edge_property_value_of_double(g_, _e, prop);
+    // auto type = grin_get_edge_type(g_, _e);
+    // T _value;
+    /*
+    vineyard::static_if<std::is_same<T, int64_t>{}>(
+        [&](auto& _value) {
+          _value = grin_get_edge_property_value_of_int64(g_, _e, ep_);
+        })(_value);
+    vineyard::static_if<std::is_same<T, double>{}>(
+        [&](auto& _value) {
+          _value = grin_get_edge_property_value_of_double(g_, _e, ep_);
+        })(_value);
     */
-    return 0;
+    int _value;
+    _value = grin_get_edge_property_value_of_int32(g_, _e, 0);
+    // grin_destroy_edge_property(g_, ep_);
+    // grin_destroy_edge_type(g_, type);
+    grin_destroy_edge(g_, _e);
+    return _value;
   }
 
   inline Nbr& operator++() {
@@ -631,7 +643,7 @@ struct Nbr {
   GRIN_GRAPH g_;
   GRIN_ADJACENT_LIST al_;
   GRIN_ADJACENT_LIST_ITERATOR cur_;
-  GRIN_EDGE_PROPERTY ep_;;
+  GRIN_EDGE_PROPERTY ep_;
 };
 #endif
 

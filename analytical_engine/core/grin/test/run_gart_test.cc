@@ -25,74 +25,86 @@
 
 #include "apps/pagerank/pagerank_gart.h"
 #include "apps/sssp/sssp_gart.h"
+#include "apps/wcc/wcc_gart.h"
 
 #include "core/grin/fragment/grin_projected_fragment.h"
 // #include "core/fragment/arrow_flattened_fragment.h"
 
 namespace bl = boost::leaf;
 
-using FlattenFragmentType =
-    gs::GRINProjectedFragment<int64_t, uint64_t, int64_t,
+using GRINProjectedFragmentType =
+    gs::GRINProjectedFragment<int64_t, uint64_t, double,
                               int64_t>;
 
 template <typename FRAG_T>
-std::shared_ptr<FRAG_T> GetFragment(char* uri, const grape::CommSpec& comm_spec) {
+std::shared_ptr<FRAG_T> GetFragment(const grape::CommSpec& comm_spec, std::string& uri) {
   LOG(FATAL) << "Unimpl";
 }
 
 template<>
-std::shared_ptr<FlattenFragmentType> GetFragment(char* uri, const grape::CommSpec& comm_spec) {
-  LOG(INFO) << "Load As GRIN Fragment";
-  GRIN_PARTITIONED_GRAPH pg = grin_get_partitioned_graph_from_storage(uri);
+std::shared_ptr<GRINProjectedFragmentType> GetFragment(const grape::CommSpec& comm_spec, std::string& uri) {
+  LOG(INFO) << "Load as GRIN fragment with uri: " << uri;
+
+  GRIN_PARTITIONED_GRAPH pg = grin_get_partitioned_graph_from_storage(uri.c_str());
+  LOG(INFO) << comm_spec.fid() << " 1";
   GRIN_PARTITION_LIST local_partitions = grin_get_local_partition_list(pg);
+  LOG(INFO) << comm_spec.fid() << " 2";
+
   size_t local_pnum = grin_get_partition_list_size(pg, local_partitions);
+  LOG(INFO) << comm_spec.fid() << " 3 " << local_pnum;
   GRIN_PARTITION partition;
   if (local_pnum == 1) {
     partition = grin_get_partition_from_list(pg, local_partitions, 0);
   } else {
     partition = grin_get_partition_from_list(pg, local_partitions, comm_spec.fid() % local_pnum);
   }
-  return std::make_shared<FlattenFragmentType>(
-    pg, partition, "", "", "person_id", "weight");
+  LOG(INFO) << comm_spec.fid() << " 4";
+
+  return std::make_shared<GRINProjectedFragmentType>(pg, partition, "user", "dist", "knows", "weight");
 }
 
-void Run(char* uri, const grape::CommSpec& comm_spec) {
-  auto frag = GetFragment<FlattenFragmentType>(uri, comm_spec);
+void Run(std::shared_ptr<GRINProjectedFragmentType> frag,
+         const grape::CommSpec& comm_spec,
+         const std::string& out_prefix,
+         std::string& output_result) {
   LOG(INFO) << "Inner vertex number: " << frag->GetInnerVerticesNum();
-  LOG(INFO) << "Edge number: " << frag->GetEdgeNum();
   auto inner_vertices = frag->InnerVertices();
-  auto iter = inner_vertices.begin();
+
   std::ofstream file_out;
   file_out.open("traverse/frag-" + std::to_string(comm_spec.fid()) + ".txt");
+
+  auto iter = inner_vertices.begin();
   while (!iter.is_end()) {
     auto v = *iter;
-    LOG(INFO) << "Vertex: " << frag->GetId(v);
-    auto out_edges = frag->GetOutgoingAdjList(v);
+    // LOG(INFO) << "Vertex: " << frag->GetId(v);
+    // file_out << frag->GetId(v) << std::endl;
+    // auto out_edges = frag->GetOutgoingAdjList(v);
+    auto out_edges = frag->GetIncomingAdjList(v);
     auto e_iter = out_edges.begin();
     while (!e_iter.is_end()) {
       auto neighbor = e_iter.neighbor();
-      file_out << frag->GetId(v) + 1 << " " << frag->GetId(neighbor) + 1  << " " << e_iter.get_data() << std::endl;
+      file_out << frag->GetId(v) << " " << frag->GetId(neighbor) << " " << static_cast<double>(e_iter.get_data()) << std::endl;
+      // file_out << frag->GetId(v) << " " << frag->GetId(neighbor) << " " << static_cast<double>(e_iter.get_data()) << std::endl;
       ++e_iter;
     }
     ++iter;
   }
   file_out.close();
-  /*
-  auto fg = std::dynamic_pointer_cast<vineyard::ArrowFragmentGroup>(
-      client.GetObject(fragment_group_id));
-  auto fid = comm_spec.WorkerToFrag(comm_spec.worker_id());
-  auto frag_id = fg->Fragments().at(fid);
-  auto arrow_frag = std::static_pointer_cast<FragmentType>(client.GetObject(frag_id));
-  auto frag = std::make_shared<FlattenFragmentType>(arrow_frag.get(), 0, 0);
-  */
+
+  // auto fg = std::dynamic_pointer_cast<vineyard::ArrowFragmentGroup>(
+  //     client.GetObject(fragment_group_id));
+  // auto fid = comm_spec.WorkerToFrag(comm_spec.worker_id());
+  // auto frag_id = fg->Fragments().at(fid);
+  // auto arrow_frag = std::static_pointer_cast<FragmentType>(client.GetObject(frag_id));
+  // auto frag = std::make_shared<FlattenFragmentType>(arrow_frag.get(), 0, 0);
 }
 
-void RunProjectedPR(std::shared_ptr<FlattenFragmentType> fragment,
+template <typename FRAG_T>
+void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
                     const grape::CommSpec& comm_spec,
-                    const std::string& out_prefix) {
-  // using AppType = grape::PageRankAuto<ProjectedFragmentType>;
-  using AppType = gs::PageRankGart<FlattenFragmentType>;
-  // using AppType = grape::PageRankLocal<ProjectedFragmentType>;
+                    const std::string& out_prefix,
+                    std::string& output_result) {
+  using AppType = gs::PageRankGart<FRAG_T>;
   LOG(INFO) << "Start to create app.";
   auto app = std::make_shared<AppType>();
   LOG(INFO) << "Start to create worker.";
@@ -103,29 +115,35 @@ void RunProjectedPR(std::shared_ptr<FlattenFragmentType> fragment,
 
   LOG(INFO) << "Start query.";
   double start = grape::GetCurrentTime();
-  worker->Query(0.85, 5);
-  if (fragment->fid() == 0) {
-    LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << " seconds";
+
+  worker->Query(0.85, 10, 1e-9);
+  MPI_Barrier(comm_spec.comm());
+
+  if (comm_spec.worker_id() == 0) {
+    LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << "seconds";
   }
+
   LOG(INFO) << "End query. fid: " << fragment->fid();
 
-  std::ofstream ostream;
-  std::string output_path = "/root/wanglei/grin_pr_result_frag_"+std::to_string(fragment->fid());
-  //    grape::GetResultFilename(out_prefix, fragment->fid());
-
-  ostream.open(output_path);
-  worker->Output(ostream);
-  ostream.close();
+  if (output_result == "true") {
+    std::ofstream ostream;
+    std::string output_path =
+      grape::GetResultFilename(out_prefix, fragment->fid());
+    
+    ostream.open(output_path);
+    worker->Output(ostream);
+    ostream.close();
+  }
 
   worker->Finalize();
 }
 
-void RunProjectedSSSP(std::shared_ptr<FlattenFragmentType> fragment,
+template <typename FRAG_T>
+void RunSSSP(std::shared_ptr<FRAG_T> fragment,
                     const grape::CommSpec& comm_spec,
-                    const std::string& out_prefix) {
-  // using AppType = grape::PageRankAuto<ProjectedFragmentType>;
-  using AppType = gs::SSSPGart<FlattenFragmentType>;
-  // using AppType = grape::PageRankLocal<ProjectedFragmentType>;
+                    const std::string& out_prefix,
+                    std::string& output_result) {
+  using AppType = gs::SSSPGart<FRAG_T>;
   LOG(INFO) << "Start to create app.";
   auto app = std::make_shared<AppType>();
   LOG(INFO) << "Start to create worker.";
@@ -135,65 +153,125 @@ void RunProjectedSSSP(std::shared_ptr<FlattenFragmentType> fragment,
   worker->Init(comm_spec, spec);
 
   LOG(INFO) << "Start query.";
-  worker->Query(5);
+  double start = grape::GetCurrentTime();
+
+  worker->Query(6);
+
+  if (comm_spec.worker_id() == 0) {
+    LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << "seconds";
+  }
+
   LOG(INFO) << "End query. fid: " << fragment->fid();
 
-  std::ofstream ostream;
-  std::string output_path =
-      grape::GetResultFilename(out_prefix, fragment->fid());
+  if (output_result == "true") {
+    std::ofstream ostream;
+    std::string output_path =
+        grape::GetResultFilename(out_prefix, fragment->fid());
 
-  ostream.open(output_path);
-  worker->Output(ostream);
-  ostream.close();
+    ostream.open(output_path);
+    worker->Output(ostream);
+    ostream.close();
+  }
 
   worker->Finalize();
 }
 
-void RunPagerank(char* uri, const grape::CommSpec& comm_spec) {
-  auto frag = GetFragment<FlattenFragmentType>(uri, comm_spec);
-  LOG(INFO) << "Start to run pagerank.";
-  RunProjectedPR(frag, comm_spec,  "./output_projected_pagerank/");
-  // RunProjectedSSSP(frag, comm_spec,  "./output_projected_pagerank/");
+template <typename FRAG_T>
+void RunWCC(std::shared_ptr<FRAG_T> fragment,
+            const grape::CommSpec& comm_spec,
+            const std::string& out_prefix,
+            std::string& output_result) {
+  using AppType = gs::WCCGart<FRAG_T>;
+  LOG(INFO) << "Start to create app.";
+  auto app = std::make_shared<AppType>();
+  LOG(INFO) << "Start to create worker.";
+  auto worker = AppType::CreateWorker(app, fragment);
+  auto spec = grape::DefaultParallelEngineSpec();
+  LOG(INFO) << "Start to init worker.";
+  worker->Init(comm_spec, spec);
+
+  LOG(INFO) << "Start query.";
+  double start = grape::GetCurrentTime();
+
+  worker->Query();
+
+  if (comm_spec.worker_id() == 0) {
+    LOG(INFO) << "Query time: " << grape::GetCurrentTime() - start << "seconds";
+  }
+
+  LOG(INFO) << "End query. fid: " << fragment->fid();
+
+  if (output_result == "true") {
+    std::ofstream ostream;
+    std::string output_path =
+        grape::GetResultFilename(out_prefix, fragment->fid());
+
+    ostream.open(output_path);
+    worker->Output(ostream);
+    ostream.close();
+  }
+
+  worker->Finalize();
+}
+
+
+void RunGrin(const grape::CommSpec& comm_spec, int argc, char** argv) {
+  int index = 2;
+
+  std::string uri = std::string(argv[index++]);
+  std::string app_name = std::string(argv[index++]);
+  std::string output_result = std::string(argv[index++]);
+
+  uri = "gart://127.0.0.1:23760?read_epoch=0&total_partition_num=4&local_partition_num=1&start_partition_id=" + std::to_string(comm_spec.fid()) + "&meta_prefix=gart_meta_";
+
+  auto frag = GetFragment<GRINProjectedFragmentType>(comm_spec, uri);
+
+  LOG(INFO) << "GetFragment end ....";
+
+  if (app_name == "pagerank") {
+    RunProjectedPR<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_pr", output_result);
+  } else if (app_name == "sssp") {
+    RunSSSP<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_sssp", output_result);
+  } else if (app_name == "wcc") {
+    RunWCC<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_wcc", output_result);
+  } else if (app_name == "traverse") {
+    Run(frag, comm_spec, "/tmp/traverse", output_result);
+  } else {
+    LOG(FATAL) << "Unknown app name: " << app_name;
+  }
+
+  LOG(INFO) << "RunGrin end ...";
 }
 
 int main(int argc, char** argv) {
+  if (argc < 2) {
+    printf(
+        "usage: ./run_gart_app <cmd_type> ...\n");
+    return 1;
+  }
+  int index = 1;
+  std::string cmd_type = std::string(argv[index++]);
+
   grape::InitMPIComm();
+
   {
     grape::CommSpec comm_spec;
     comm_spec.Init(MPI_COMM_WORLD);
 
-    std::string uri_str = "gart://192.168.0.22:23760?read_epoch=1&total_partition_num=4&local_partition_num=1&start_partition_id="+std::to_string(comm_spec.fid())+"&meta_prefix=gart_meta_";
+    if (cmd_type == "run_grin") {
+      RunGrin(comm_spec, argc, argv);
+    }
 
-    char* uri = const_cast<char*>(uri_str.c_str());
-
-    RunPagerank(uri, comm_spec);
-
-    /*
-    int read_epoch = 1;
-    std::string etcd_endpoint = "http://192.168.0.22:23760";
-    std::string meta_prefix = "gart_meta_";
-    char** argv = new char*[5];
-    argv[0] = new char[etcd_endpoint.length() + 1];
-    argv[1] = new char[std::to_string(comm_spec.fnum()).length() + 1];
-    argv[2] = new char[std::to_string(comm_spec.fid()).length() + 1];
-    argv[3] = new char[std::to_string(read_epoch).length() + 1];
-    argv[4] = new char[meta_prefix.length() + 1];
-
-    strcpy(argv[0], etcd_endpoint.c_str());
-    strcpy(argv[1], std::to_string(comm_spec.fnum()).c_str());
-    strcpy(argv[2], std::to_string(comm_spec.fid()).c_str());
-    strcpy(argv[3], std::to_string(read_epoch).c_str());
-    strcpy(argv[4], meta_prefix.c_str());
-    RunPagerank(argv, comm_spec);
-    */
-    // Run(argv, comm_spec);
+    MPI_Barrier(comm_spec.comm());
   }
+
+  LOG(INFO) << "Before FinalizeMPIComm...";
 
   grape::FinalizeMPIComm();
   return 0;
 }
 
-template class gs::GRINProjectedFragment<int64_t, uint64_t, int64_t,
+template class gs::GRINProjectedFragment<int64_t, uint64_t, double,
                                int64_t>;
 // template class gs::GRINFlattenedFragment<std::string, uint64_t, grape::EmptyType,
 //                                           grape::EmptyType>;

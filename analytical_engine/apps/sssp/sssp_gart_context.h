@@ -55,10 +55,10 @@ class SSSPGartContext
     while (!iter.is_end()) {
       auto v = *iter;
       if (partial_result[v] == std::numeric_limits<double>::max()) {
-        os << frag.GetId(v) + 1 << " " << std::scientific << std::setprecision(16)
+        os << frag.GetId(v) << " "
           << partial_result[v] << std::endl;
       } else {
-        os << frag.GetId(v) + 1 << " " << std::scientific << std::setprecision(3)
+        os << frag.GetId(v) << " "
           << partial_result[v] << std::endl;
       }
       ++iter;
@@ -68,6 +68,7 @@ class SSSPGartContext
   oid_t source_id;
   typename FRAG_T::template vertex_array_t<double>& partial_result;
   typename FRAG_T::template vertex_array_t<bool> modified;
+  int step;
 
 };
 }  // namespace gs
