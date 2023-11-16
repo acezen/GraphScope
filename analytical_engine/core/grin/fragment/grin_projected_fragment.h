@@ -438,18 +438,6 @@ class GRINProjectedFragment {
   }
 
   inline grape::DestList OEDests(const vertex_t& v) const {
-    if (this->GetId(v) == 35076) {
-        LOG(INFO) << "fragment frag-" << fid_ << " has vertex 35076";
-        auto internal_id2 = grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
-        LOG(INFO) << 35076 << " internal id is " << internal_id2;
-        auto dsts = grape::DestList(odoffset_[internal_id2], odoffset_[internal_id2 + 1]);
-        const fid_t* ptr = dsts.begin;
-        LOG(INFO) << "wanglei2: " << ptr << ", " << dsts.end;
-        while (ptr != dsts.end) {
-          fid_t fid = *(ptr++);
-          LOG(INFO) << "fragment send to frag " << fid;
-        }
-    }
     auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
     return grape::DestList(odoffset_[internal_id],
                            odoffset_[internal_id + 1]);
@@ -639,15 +627,9 @@ class GRINProjectedFragment {
             auto neighbor = grin_get_neighbor_from_adjacent_list_iter(g_, e_iter);
             auto v_ref = grin_get_vertex_ref_by_vertex(g_, neighbor);
             auto p = grin_get_master_partition_from_vertex_ref(g_, v_ref);
-            if (fid_ == 3 && internal_id == 8768) {
-              // LOG(INFO) << "--------------- p is " << p << " index is " << index;
-            }
 
             if (!grin_equal_partition(g_, p, partition_)) {
 #ifdef GRIN_TRAIT_NATURAL_ID_FOR_PARTITION
-              if (fid_ == 3 && internal_id == 8768) {
-                LOG(INFO) << "----------- set dstset: " << grin_get_partition_id(g_, p);
-              }
               dstset.insert(grin_get_partition_id(g_, p));
 #else
               // todo
@@ -666,15 +648,11 @@ class GRINProjectedFragment {
         grin_get_next_vertex_list_iter(g_, iv_iter);
       }
 
+      std::reverse(fid_list.begin(), fid_list.end());
+
       fid_list.shrink_to_fit();
       fid_list_offset[0] = fid_list.data();
       for (size_t i = 0; i < ivnum_; ++i) {
-        // if (i == 6877 && fid_ == 3) {
-        //   LOG(INFO) << "wanglei: " << fid_list_offset[i] << " , " << fid_list_offset[i] + id_num[i];
-        //   for (auto idx = 0; idx < id_num[i]; idx++) {
-        //     LOG(INFO) << "!!!!!!!! fid is : " << *(fid_list_offset[i] + idx);
-        //   }
-        // }
         fid_list_offset[i + 1] = fid_list_offset[i] + id_num[i];
       }
 #endif

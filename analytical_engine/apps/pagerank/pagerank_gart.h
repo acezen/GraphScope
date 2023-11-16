@@ -51,12 +51,8 @@ class PageRankGart
 
     Sum(frag.GetInnerVerticesNum(), ctx.graph_vnum);
 
-    LOG(INFO) << "vnum: " << ctx.graph_vnum;
-
     ctx.step = 0;
     double p = 1.0 / ctx.graph_vnum;
-
-    LOG(INFO) << "p: " << p;
 
     // assign initial ranks
     auto iter = inner_vertices.begin();
@@ -67,7 +63,6 @@ class PageRankGart
       ctx.degree[u] =
         static_cast<double>(frag.GetLocalOutDegree(u));
 
-      // LOG(INFO) << "degree: " << frag.GetId(u) << ", " << ctx.degree[u];
       if (ctx.degree[u] != 0.0) {
         messages.SendMsgThroughOEdges<fragment_t, double>(
             frag, u, ctx.result[u] / ctx.degree[u]);
@@ -88,11 +83,7 @@ class PageRankGart
     double dangling_sum =
         ctx.alpha * p * static_cast<double>(ctx.dangling_vnum);
 
-    LOG(INFO) << "dangling_sum: " << dangling_sum;
-
     Sum(dangling_sum, ctx.dangling_sum);
-
-    LOG(INFO) << "dangling_sum total: " << ctx.dangling_sum;
 
     messages.ForceContinue();
   }
@@ -113,17 +104,10 @@ class PageRankGart
       vertex_t v(0);
       double val;
 
-      int index = 0;
       while (messages.GetMessage<fragment_t, double>(frag, v, val)) {
-        index++;
-        if (frag.GetId(v) == 35076) {
-          LOG(INFO) << "fid " << frag.fid() << " received message: " << frag.GetId(v) << ", " << val;
-        }
         ctx.result[v] = val;
         ctx.pre_result[v] = val;
       }
-
-      // LOG(INFO) << "Total received number: " << index;
     }
 
     LOG_IF(INFO, frag.fid() == 0) << "Message process: " << grape::GetCurrentTime() - t << " seconds";
@@ -135,11 +119,7 @@ class PageRankGart
 
       if (ctx.degree[u] > 0.0) {
         ctx.pre_result[u] = ctx.result[u] / ctx.degree[u];
-        if (frag.GetId(u) == 16690 || frag.GetId(u) == 35076) {
-          // LOG(INFO) << "IncEval-" <<  ctx.step << " fid: " << frag.fid() << " pre_result: " << frag.GetId(u) << ", " << ctx.pre_result[u];
-        }
       } else {
-        // LOG(INFO) << "IncEval-" <<  ctx.step << " pre_result: " << frag.GetId(u) << ", " << ctx.pre_result[u] << ", degree " << 0;
         ctx.pre_result[u] = ctx.result[u];
       }
       ++iter;
@@ -148,40 +128,26 @@ class PageRankGart
 
     t = grape::GetCurrentTime();
     double base = (1.0 - ctx.alpha) / ctx.graph_vnum + dangling_sum / ctx.graph_vnum;
-    // LOG(INFO) <<  "IncEval-" <<  ctx.step << " base: " << base;
     iter = inner_vertices.begin();
     while (!iter.is_end()) {
       auto u = *iter;
 
       double cur = 0;
       if (frag.directed()) {
-        if (frag.GetId(u) == 16690) {
-          LOG(INFO) << "----- 16690: access incoming cur: " << cur;
-        }
         auto es = frag.GetIncomingAdjList(u);
         auto e_iter = es.begin();
         while (!e_iter.is_end()) {
           cur += ctx.pre_result[e_iter.get_neighbor()];
-          if (frag.GetId(u) == 16690) {
-            LOG(INFO) << "----- 16690 <- " << frag.GetId(e_iter.get_neighbor()) << "neighbor pre rlt: " << ctx.pre_result[e_iter.get_neighbor()] << " cur: " << cur;
-          }
           ++e_iter;
         }
       } else {
-        if (frag.GetId(u) == 16690) {
-          LOG(INFO) << "----- 16690: access outgoing cur: " << cur;
-        }
         auto es = frag.GetOutgoingAdjList(u);
         auto e_iter = es.begin();
         while (!e_iter.is_end()) {
            cur += ctx.pre_result[e_iter.get_neighbor()];
-           if (frag.GetId(u) == 16690) {
-            LOG(INFO) << "----- 16690 -> " << frag.GetId(e_iter.get_neighbor()) << " cur: " << cur;
-           }
            ++e_iter;
         }
       }
-      // LOG(INFO) << "IncEval-" <<  ctx.step << " cur: " << frag.GetId(u) << ", " << cur;
       ctx.result[u] = cur * ctx.alpha + base;
       ++iter;
     }
