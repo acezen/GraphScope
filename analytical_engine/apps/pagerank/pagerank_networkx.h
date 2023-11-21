@@ -18,6 +18,7 @@ limitations under the License.
 
 #include "grape/grape.h"
 
+#include "core/app/app_base.h"
 #include "apps/pagerank/pagerank_networkx_context.h"
 
 namespace gs {
@@ -35,17 +36,16 @@ namespace gs {
 
 template <typename FRAG_T>
 class PageRankNetworkX
-    : public grape::ParallelAppBase<FRAG_T, PageRankNetworkXContext<FRAG_T>>,
-      public grape::Communicator,
-      public grape::ParallelEngine {
+    : public AppBase<FRAG_T, PageRankNetworkXContext<FRAG_T>>,
+      public grape::Communicator {
  public:
   static constexpr grape::MessageStrategy message_strategy =
       grape::MessageStrategy::kAlongOutgoingEdgeToOuterVertex;
   static constexpr grape::LoadStrategy load_strategy =
       grape::LoadStrategy::kBothOutIn;
 
-  INSTALL_PARALLEL_WORKER(PageRankNetworkX<FRAG_T>,
-                          PageRankNetworkXContext<FRAG_T>, FRAG_T)
+  INSTALL_DEFAULT_WORKER(PageRankNetworkX<FRAG_T>,
+                         PageRankNetworkXContext<FRAG_T>, FRAG_T)
 
   using vertex_t = typename fragment_t::vertex_t;
   using vid_t = typename fragment_t::vid_t;
@@ -57,12 +57,22 @@ class PageRankNetworkX
     auto inner_vertices = frag.InnerVertices();
 
     Sum(frag.GetInnerVerticesNum(), ctx.graph_vnum);
-    messages.InitChannels(thread_num());
+    // messages.InitChannels(thread_num());
 
     ctx.step = 0;
     double p = 1.0 / ctx.graph_vnum;
 
     // assign initial ranks
+    for (const auto &u : inner_vertices) {
+      ctx.result[u] = p;
+      ctx.degree[u] =
+          static_cast<double>(frag.GetLocalOutDegree(u));
+      if (ctx.degree[u] != 0.0) {
+        messages.SendMsgThroughOEdges<fragment_t, double>(
+            frag, u, ctx.result[u] / ctx.degree[u]);
+      }
+    }
+    /*
     ForEach(inner_vertices.begin(), inner_vertices.end(),
             [&ctx, &frag, p, &messages](int tid, const vertex_t& u) {
               ctx.result[u] = p;
@@ -73,8 +83,8 @@ class PageRankNetworkX
                     frag, u, ctx.result[u] / ctx.degree[u], tid);
               }
             });
-
-    for (auto u : inner_vertices) {
+    */
+    for (const auto &u : inner_vertices) {
       if (ctx.degree[u] == 0.0) {
         ++ctx.dangling_vnum;
       }
@@ -99,15 +109,34 @@ class PageRankNetworkX
     double t = grape::GetCurrentTime();
     // process received ranks sent by other workers
     {
+      vertex_t v(0);
+      double val;
+
+      while (messages.GetMessage<fragment_t, double>(frag, v, val)) {
+        ctx.result[v] = val;
+        ctx.pre_result[v] = val;
+      }
+    }
+    /*
+    {
       messages.ParallelProcess<fragment_t, double>(
           thread_num(), frag, [&ctx](int tid, const vertex_t& u, const double& msg) {
             ctx.result[u] = msg;
             ctx.pre_result[u] = msg;
           });
     }
+    */
     LOG_IF(INFO, frag.fid() == 0) << "Message process: " << grape::GetCurrentTime() - t << " seconds";
 
     t = grape::GetCurrentTime();
+    for (const auto &u : inner_vertices) {
+      if (ctx.degree[u] > 0.0) {
+        ctx.pre_result[u] = ctx.result[u] / ctx.degree[u];
+      } else {
+        ctx.pre_result[u] = ctx.result[u];
+      }
+    }
+    /*
     ForEach(inner_vertices.begin(), inner_vertices.end(),
             [&ctx](int tid, const vertex_t& u) {
               if (ctx.degree[u] > 0.0) {
@@ -116,10 +145,27 @@ class PageRankNetworkX
                 ctx.pre_result[u] = ctx.result[u];
               }
             });
+    */
     LOG_IF(INFO, frag.fid() == 0) << "Process pre_result: " << grape::GetCurrentTime() - t << " seconds";
 
     t = grape::GetCurrentTime();
     double base = (1.0 - ctx.alpha) / ctx.graph_vnum + dangling_sum / ctx.graph_vnum;
+    for (const auto &u : inner_vertices) {
+      double cur = 0;
+      if (frag.directed()) {
+        auto es = frag.GetIncomingAdjList(u);
+        for (auto& e : es) {
+          cur += ctx.pre_result[e.get_neighbor()];
+        }
+      } else {
+        auto es = frag.GetOutgoingAdjList(u);
+        for (auto& e : es) {
+          cur += ctx.pre_result[e.get_neighbor()];
+        }
+      }
+      ctx.result[u] = cur * ctx.alpha + base;
+    }
+    /*
     ForEach(inner_vertices.begin(), inner_vertices.end(),
             [&ctx, base, &frag](int tid, const vertex_t& u) {
               double cur = 0;
@@ -136,7 +182,7 @@ class PageRankNetworkX
               }
               ctx.result[u] = cur * ctx.alpha + base;
             });
-
+    */
     LOG_IF(INFO, frag.fid() == 0) << "Compute: " << grape::GetCurrentTime() - t << " seconds";
     t = grape::GetCurrentTime();
     double eps = 0.0;
@@ -155,6 +201,13 @@ class PageRankNetworkX
       return;
     }
 
+    for (const auto &u : inner_vertices) {
+      if (ctx.degree[u] > 0) {
+        messages.SendMsgThroughOEdges<fragment_t, double>(
+           frag, u, ctx.result[u] / ctx.degree[u]); 
+      }
+    }
+    /*
     ForEach(inner_vertices.begin(), inner_vertices.end(),
             [&ctx, &frag, &messages](int tid, const vertex_t& u) {
               if (ctx.degree[u] > 0) {
@@ -162,6 +215,7 @@ class PageRankNetworkX
                     frag, u, ctx.result[u] / ctx.degree[u], tid);
               }
             });
+    */
     LOG_IF(INFO, frag.fid() == 0) << "Update: " << grape::GetCurrentTime() - t << " seconds";
 
     double new_dangling = ctx.alpha * static_cast<double>(ctx.dangling_sum);

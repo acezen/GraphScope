@@ -37,7 +37,7 @@ class PageRankNetworkXContext
       : grape::VertexDataContext<FRAG_T, double>(fragment, true),
         result(this->data()) {}
 
-  void Init(grape::ParallelMessageManager& messages, double alpha,
+  void Init(grape::DefaultMessageManager& messages, double alpha,
             int max_round, double tolerance) {
     auto& frag = this->fragment();
     auto inner_vertices = frag.InnerVertices();
