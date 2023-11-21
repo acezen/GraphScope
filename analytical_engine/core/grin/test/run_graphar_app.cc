@@ -37,7 +37,7 @@ template <typename FRAG_T>
 void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
                     const grape::CommSpec& comm_spec,
                     const std::string& out_prefix, std::string& output_result) {
-  using AppType = gs::PageRankGraphAr<FRAG_T>;
+  using AppType = gs::PageRankNetworkX<FRAG_T>;
   auto app = std::make_shared<AppType>();
   auto worker = AppType::CreateWorker(app, fragment);
   auto spec = grape::DefaultParallelEngineSpec();
@@ -71,7 +71,7 @@ void RunProjectedPR(std::shared_ptr<FRAG_T> fragment,
   worker->Finalize();
 }
 
-std::shared_ptr<GRINGraphArFragmentType> GetGrinFragment(
+std::shared_ptr<GRINProjectedFragmentType> GetGrinFragment(
     const grape::CommSpec& comm_spec,const std::string& uri) {
   LOG(INFO) << "Load as GRIN Fragment";
   GRIN_PARTITIONED_GRAPH pg = grin_get_partitioned_graph_from_storage(uri.c_str());
@@ -84,7 +84,7 @@ std::shared_ptr<GRINGraphArFragmentType> GetGrinFragment(
     partition = grin_get_partition_from_list(pg, local_partitions, comm_spec.fid() % local_pnum);
   }
 
-  return std::make_shared<GRINGraphArFragmentType>(pg, partition, "person", "dist", "knows", "weight");
+  return std::make_shared<GRINProjectedFragmentType>(pg, partition, "person", "dist", "knows", "weight");
 }
 
 
@@ -95,7 +95,7 @@ void RunGrin(const grape::CommSpec& comm_spec, int argc, char** argv) {
   std::string output_result = std::string(argv[index++]);
   auto frag = GetGrinFragment(comm_spec, uri);
 
-  RunProjectedPR<GRINGraphArFragmentType>(frag, comm_spec, "/tmp/output_pr", output_result);
+  RunProjectedPR<GRINProjectedFragmentType>(frag, comm_spec, "/tmp/output_pr", output_result);
 }
 
 int main(int argc, char** argv) {
@@ -105,7 +105,9 @@ int main(int argc, char** argv) {
     return 1;
   }
   grape::InitMPIComm();
-  RunGrin(argc, argv);
+  grape::CommSpec comm_spec;
+  comm_spec.Init(MPI_COMM_WORLD);
+  RunGrin(comm_spec, argc, argv);
   grape::FinalizeMPIComm();
   return 0;
 }

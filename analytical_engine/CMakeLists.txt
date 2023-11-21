@@ -268,8 +268,8 @@ if(gRPC_FOUND)
     get_target_property(GRPC_CPP_PLUGIN gRPC::grpc_cpp_plugin LOCATION)
     get_target_property(GRPC_INCLUDE_DIR gRPC::grpc INTERFACE_INCLUDE_DIRECTORIES)
 else()
-    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGRPC.cmake)
-    set(GRPC_LIBRARIES ${GPR_LIBRARY} ${GRPC_LIBRARY} ${GRPC_GRPC++_LIBRARY})
+    #include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGRPC.cmake)
+    #set(GRPC_LIBRARIES ${GPR_LIBRARY} ${GRPC_LIBRARY} ${GRPC_GRPC++_LIBRARY})
 endif()
 
 # find vineyard after arrow to avoid duplicate target names

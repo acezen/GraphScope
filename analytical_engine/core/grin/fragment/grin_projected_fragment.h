@@ -108,7 +108,7 @@ class GRINProjectedFragment {
     fid_ = grin_get_partition_id(pg_, partition_);
     fnum_ = grin_get_total_partitions_number(pg_);
     g_ = grin_get_local_graph_by_partition(partitioned_graph, partition);
-    directed_ = grin_is_directed(g_);
+    directed_ = true;
     tvnum_ = ivnum_ = ovnum_ = 0;
     vt_ = grin_get_vertex_type_by_name(g_, v_label.c_str());
     et_ = grin_get_edge_type_by_name(g_, e_label.c_str());
@@ -236,7 +236,6 @@ class GRINProjectedFragment {
     auto v_ref = grin_deserialize_int64_to_vertex_ref(g_, gid);
     auto grin_v = grin_get_vertex_from_vertex_ref(g_, v_ref);
     if (grin_v == GRIN_NULL_VERTEX) {
-      grin_destroy_vertex(g_, v_ref);
       grin_destroy_vertex_ref(g_, v_ref);
       return false;
     }
@@ -319,7 +318,6 @@ class GRINProjectedFragment {
     auto v_ref = grin_deserialize_int64_to_vertex_ref(g_, gid);
     auto grin_v = grin_get_vertex_from_vertex_ref(g_, v_ref);
     if (grin_v == GRIN_NULL_VERTEX) {
-      grin_destroy_vertex(g_, v_ref);
       grin_destroy_vertex_ref(g_, v_ref);
       return false;
     }
@@ -332,7 +330,6 @@ class GRINProjectedFragment {
     auto v_ref = grin_deserialize_int64_to_vertex_ref(g_, gid);
     auto grin_v = grin_get_vertex_from_vertex_ref(g_, v_ref);
     if (grin_v == GRIN_NULL_VERTEX) {
-      grin_destroy_vertex(g_, v_ref);
       grin_destroy_vertex_ref(g_, v_ref);
       return false;
     }
@@ -353,8 +350,7 @@ class GRINProjectedFragment {
 
   inline adj_list_t GetIncomingAdjList(const vertex_t& v) const {
     auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v.grin_v);
-    auto al = v2iadj_[v.grin_v];
-    // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v.grin_v, et_);
+    auto al = v2iadj_[internal_id];
 #ifdef GRIN_ENABLE_ADJACENT_LIST_ARRAY
     auto sz = grin_get_adjacent_list_size(g_, al);
     return adj_list_t(g_, al, ep_, 0, sz);
@@ -570,7 +566,7 @@ class GRINProjectedFragment {
         auto v = grin_get_vertex_from_list(g_, ivl_, i);
         auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v);
         if (in_edge) {
-          auto al = v2iadj_.at(internal_id);
+          auto al = v2iadj_[internal_id];
           auto e_iter = grin_get_adjacent_list_begin(g_, al);
           while (!grin_is_adjacent_list_end(g_, e_iter)) {
             auto neighbor = grin_get_neighbor_from_adjacent_list_iter(g_, e_iter);
@@ -591,7 +587,7 @@ class GRINProjectedFragment {
           }
         }
         if (out_edge) {
-          auto al = v2oadj_.at(internal_id);
+          auto al = v2oadj_[internal_id];
           auto e_iter = grin_get_adjacent_list_begin(g_, al);
           while (!grin_is_adjacent_list_end(g_, e_iter)) {
             auto neighbor = grin_get_neighbor_from_adjacent_list_iter(g_, e_iter);
