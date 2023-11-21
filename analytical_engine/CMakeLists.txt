@@ -194,12 +194,12 @@ if (OPENSSL_FOUND)
     include_directories(SYSTEM ${OPENSSL_INCLUDE_DIR})
 endif()
 
-find_package(Boost REQUIRED COMPONENTS system filesystem
-             # required by folly
-             context program_options regex thread)
-include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+#find_package(Boost REQUIRED COMPONENTS system filesystem
+#             # required by folly
+#             context program_options regex thread)
+#include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 # eliminate a lot of warnings for newer version of boost library.
-add_compile_options(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
+#add_compile_options(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 
 # check the gcc abi
 include("cmake/CheckGCCABICompatibility.cmake")
@@ -246,7 +246,7 @@ if (NOT Protobuf_FOUND)
 endif()
 include_directories(${Protobuf_INCLUDE_DIRS})
 
-find_package(Arrow QUIET)
+# find_package(Arrow QUIET)
 if(Arrow_FOUND)
     set(ARROW_INCLUDE_DIR)
     if (TARGET arrow_shared)
@@ -262,7 +262,7 @@ else()
     endif()
 endif()
 
-find_package(gRPC QUIET)
+# find_package(gRPC QUIET)
 if(gRPC_FOUND)
     set(GRPC_LIBRARIES gRPC::gpr gRPC::grpc gRPC::grpc++)
     get_target_property(GRPC_CPP_PLUGIN gRPC::grpc_cpp_plugin LOCATION)
@@ -273,11 +273,11 @@ else()
 endif()
 
 # find vineyard after arrow to avoid duplicate target names
-add_compile_options(-DENABLE_SELECTOR)
+# add_compile_options(-DENABLE_SELECTOR)
 
-if(Arrow_FOUND AND Arrow_VERSION VERSION_GREATER 9.0.1)
-    set(CMAKE_CXX_STANDARD 17)
-endif()
+# if(Arrow_FOUND AND Arrow_VERSION VERSION_GREATER 9.0.1)
+#    set(CMAKE_CXX_STANDARD 17)
+# endif()
 
 # Generate proto
 execute_process(COMMAND python3 ../proto/proto_generator.py "${PROJECT_SOURCE_DIR}/proto" --cpp

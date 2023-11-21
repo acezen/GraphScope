@@ -30,7 +30,6 @@
 
 #include "core/grin/fragment/grin_util.h" 
 #include "core/config.h"
-#include "proto/types.pb.h"
 
 namespace grape {
 class CommSpec;
