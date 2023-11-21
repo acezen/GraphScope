@@ -27,7 +27,6 @@
 
 #include "grape/fragment/fragment_base.h"
 #include "grape/types.h"
-#include "vineyard/common/util/config.h"
 
 #include "core/grin/fragment/grin_util.h" 
 #include "core/config.h"
