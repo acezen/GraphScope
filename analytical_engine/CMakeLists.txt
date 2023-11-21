@@ -148,10 +148,6 @@ find_package(Threads REQUIRED)
 find_package(MPI REQUIRED)
 include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
 
-# Generate proto
-execute_process(COMMAND python3 proto/proto_generator.py "${PROJECT_SOURCE_DIR}/proto" --cpp
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/..)
-
 # put `-fopenmp` after `find_package(MPI)` as `MPI_CXX_COMPILER` cannot find it correctly
 if (APPLE)
     if (POLICY CMP0056)
@@ -277,14 +273,20 @@ else()
 endif()
 
 # find vineyard after arrow to avoid duplicate target names
-find_package(vineyard 0.15.0 REQUIRED)
-include_directories(${VINEYARD_INCLUDE_DIRS})
 add_compile_options(-DENABLE_SELECTOR)
 
 if(Arrow_FOUND AND Arrow_VERSION VERSION_GREATER 9.0.1)
     set(CMAKE_CXX_STANDARD 17)
 endif()
 
+# Generate proto
+execute_process(COMMAND python3 ../proto/proto_generator.py "${PROJECT_SOURCE_DIR}/proto" --cpp
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+file(GLOB PROTO_CPP_FILES "proto/*.cc")
+file(GLOB CORE_RPC_SRC_FILES "core/server/*.cc")
+
+# Add targets
 if (ENABLE_JAVA_SDK)
     target_sources(gs_util PRIVATE "core/java/javasdk.cc")
     target_compile_definitions(gs_util PUBLIC ENABLE_JAVA_SDK)
@@ -301,7 +303,7 @@ endif()
 if (LET_IT_CRASH_ON_EXCEPTION)
     target_compile_definitions(grape_engine PRIVATE LET_IT_CRASH_ON_EXCEPTION)
 endif ()
-
+# target_link_libraries(grape_engine PRIVATE OpenMP::OpenMP_CXX)
 
 # An executable to work around for graphx pregel.
 if (ENABLE_JAVA_SDK)
@@ -420,6 +422,7 @@ endif ()
 
 # find_package(etcd-cpp-api REQUIRED)
 if (BUILD_GRIN)
+    add_definitions(-DGAR_NAMESPACE=GraphArchive)
     if(CMAKE_VERSION VERSION_GREATER "3.9" AND
         (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
         include(CheckIPOSupported)
@@ -433,19 +436,26 @@ if (BUILD_GRIN)
     endif()
     message(STATUS "${CMAKE_CURRENT_SOURCE_DIR}" ${${CMAKE_CURRENT_SOURCE_DIR}})
     file(GLOB_RECURSE GRIN_SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}" "core/grin/grin/*.cc")
-    file(GLOB_RECURSE PROTO_SRC_FILES "/root/flex-grin/v6d/build/modules/graph/*.cc")
-    message(STATUS "GRIN_SRC_FILES" ${GRIN_SRC_FILES} ${PROTO_SRC_FILES})
+    message(STATUS "GRIN_SRC_FILES" ${GRIN_SRC_FILES} ${CMAKE_CURRENT_SOURCE_DIR})
 
     # find_package(etcd-cpp-api REQUIRED)
+    find_package(gar REQUIRED)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -fno-omit-frame-pointer -fsanitize=address")
+    set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
     macro(add_grin_vineyard_app target)
         set(options)
         set(oneValueArgs)
         set(multiValueArgs SRCS)
         cmake_parse_arguments(add_grin_vineyard_app "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-        add_executable(${target} ${add_grin_vineyard_app_SRCS} ${GRIN_SRC_FILES} ${PROTO_SRC_FILES})
-        target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /usr/local/include/grin /root/flex-grin/v6d/build/modules/graph)
+        add_executable(${target} ${add_grin_vineyard_app_SRCS} ${GRIN_SRC_FILES})
+        # add_executable(${target} ${add_grin_vineyard_app_SRCS})
+        target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /usr/local/include/grin)
+        target_include_directories(${target} PRIVATE ${LIBGRAPELITE_INCLUDE_DIRS}/grape/analytical_apps /usr/local/include/grin /apsara/weibin/graphar/GraphAr/cpp)
         # target_include_directories(${target} PRIVATE /workspaces/GraphScope-GRIN/GART)
-        target_link_libraries(${target} PRIVATE  ${LIBGRAPELITE_LIBRARIES} ${VINEYARD_LIBRARIES} ${Protobuf_LIBRARIES})
+        target_include_directories(${target} PRIVATE /apsara/weibin/graphar/GraphAr)
+        # target_link_libraries(${target} PRIVATE ${LIBGRAPELITE_LIBRARIES} "/workspaces/GraphScope-GraphAr/GraphAr/build/libgar.so")
+        # target_link_libraries(${target} PRIVATE ${LIBGRAPELITE_LIBRARIES} ${Protobuf_LIBRARIES} "/workspaces/GraphScope-GraphAr/GraphAr/build/grin/libgar-grin.so")
+        target_link_libraries(${target} PRIVATE ${LIBGRAPELITE_LIBRARIES} ${Protobuf_LIBRARIES} gar)
         if (${LIBUNWIND_FOUND})
             target_link_libraries(${target} PRIVATE ${LIBUNWIND_LIBRARIES})
         endif ()
@@ -453,9 +463,7 @@ if (BUILD_GRIN)
     endmacro()
 
     message(STATUS ${VINEYARD_INCLUDE_DIRS})
-    # add_grin_vineyard_app(run_gart_test SRCS core/grin/test/run_gart_test.cc)
-    add_grin_vineyard_app(run_grin_app SRCS core/grin/test/run_grin_app.cc)
-    # add_grin_vineyard_app(run_wcc SRCS core/grin/test/wcc.cc)
+    add_grin_vineyard_app(run_graphar_app SRCS core/grin/test/run_graphar_app.cc)
 endif ()
 
 # Cpplint
@@ -562,26 +570,3 @@ macro(install_gsa_dependency_modules cmake_target)
             PATTERN "*.cmake"                                                # select cmake files
             )
 endmacro()
-
-if (ENABLE_JAVA_SDK)
-    install_gsa_binary(graphx_runner)
-endif()
-
-install_gsa_headers("${PROJECT_SOURCE_DIR}/apps")
-install_gsa_headers("${PROJECT_SOURCE_DIR}/benchmarks")
-install_gsa_headers("${PROJECT_SOURCE_DIR}/core")
-install_gsa_headers("${PROJECT_SOURCE_DIR}/proto")
-install_gsa_app_frames("${PROJECT_SOURCE_DIR}/frame")
-
-install_gsa_dependency_modules("${PROJECT_SOURCE_DIR}/cmake")
-
-configure_file(graphscope-analytical-config.in.cmake
-        "${PROJECT_BINARY_DIR}/graphscope-analytical-config.cmake" @ONLY
-)
-configure_file(graphscope-analytical-config-version.in.cmake
-        "${PROJECT_BINARY_DIR}/graphscope-analytical-config-version.cmake" @ONLY
-)
-install(FILES "${PROJECT_BINARY_DIR}/graphscope-analytical-config.cmake"
-        "${PROJECT_BINARY_DIR}/graphscope-analytical-config-version.cmake"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/graphscope-analytical
-)
