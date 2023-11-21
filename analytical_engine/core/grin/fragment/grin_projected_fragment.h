@@ -503,7 +503,6 @@ class GRINProjectedFragment {
   void initDestFidListSeq(const bool in_edge, const bool out_edge,
                           std::vector<fid_t>& fid_list,
                           std::vector<fid_t*>& fid_list_offset) {
-#ifdef GRIN_ENABLE_VERTEX_LIST_ARRAY
       if (!fid_list_offset.empty()) {
         return;
       }
@@ -511,13 +510,13 @@ class GRINProjectedFragment {
       fid_list_offset.resize(ivnum_ + 1, NULL);
       std::vector<int> id_num(ivnum_, 0);
       std::set<fid_t> dstset;
+#if defined(GRIN_ENABLE_VERTEX_LIST_ARRAY) && defined(GRIN_ENABLE_ADJACENT_LIST_ARRAY)
       for (size_t i = 0; i < ivnum_; ++i) {
         dstset.clear();
         auto v = grin_get_vertex_from_list(g_, ivl_, i);
         auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v);
         if (in_edge) {
           auto al = v2iadj_[internal_id];
-          // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::IN, v, et_);
           auto sz = grin_get_adjacent_list_size(g_, al);
           for (size_t j = 0; j < sz; ++j) {
             auto neighbor = grin_get_neighbor_from_adjacent_list(g_, al, j);
@@ -538,7 +537,6 @@ class GRINProjectedFragment {
         }
         if (out_edge) {
           auto al = v2oadj_[internal_id];
-          // auto al = grin_get_adjacent_list_by_edge_type(g_, GRIN_DIRECTION::OUT, v, et_);
           auto sz = grin_get_adjacent_list_size(g_, al);
           for (size_t j = 0; j < sz; ++j) {
             auto neighbor = grin_get_neighbor_from_adjacent_list(g_, al, j);
@@ -568,13 +566,65 @@ class GRINProjectedFragment {
       for (size_t i = 0; i < ivnum_; ++i) {
         fid_list_offset[i + 1] = fid_list_offset[i] + id_num[i];
       }
-#else  // GRIN_ENABLE_VERTEX_LIST_ARRAY
-      if (!fid_list_offset.empty()) {
-        return;
+#elif defined(GRIN_ENABLE_VERTEX_LIST_ARRAY) && defined(GRIN_ENABLE_ADJACENT_LIST_ITERATOR)
+      for (size_t i = 0; i < ivnum_; ++i) {
+        dstset.clear();
+        auto v = grin_get_vertex_from_list(g_, ivl_, i);
+        auto internal_id = grin_get_vertex_internal_id_by_type(g_, vt_, v);
+        if (in_edge) {
+          auto al = v2iadj_.at(internal_id);
+          auto e_iter = grin_get_adjacent_list_begin(g_, al);
+          while (!grin_is_adjacent_list_end(g_, e_iter)) {
+            auto neighbor = grin_get_neighbor_from_adjacent_list_iter(g_, e_iter);
+            auto v_ref = grin_get_vertex_ref_by_vertex(g_, neighbor);
+            auto p = grin_get_master_partition_from_vertex_ref(g_, v_ref);
+
+            if (!grin_equal_partition(g_, p, partition_)) {
+#ifdef GRIN_TRAIT_NATURAL_ID_FOR_PARTITION
+              dstset.insert(grin_get_partition_id(g_, p));
+#else
+              // todo
+#endif
+            }
+            grin_destroy_partition(g_, p);
+            grin_destroy_vertex_ref(g_, v_ref);
+            grin_destroy_vertex(g_, neighbor);
+            grin_get_next_adjacent_list_iter(g_, e_iter);
+          }
+        }
+        if (out_edge) {
+          auto al = v2oadj_.at(internal_id);
+          auto e_iter = grin_get_adjacent_list_begin(g_, al);
+          while (!grin_is_adjacent_list_end(g_, e_iter)) {
+            auto neighbor = grin_get_neighbor_from_adjacent_list_iter(g_, e_iter);
+            auto v_ref = grin_get_vertex_ref_by_vertex(g_, neighbor);
+            auto p = grin_get_master_partition_from_vertex_ref(g_, v_ref);
+
+            if (!grin_equal_partition(g_, p, partition_)) {
+#ifdef GRIN_TRAIT_NATURAL_ID_FOR_PARTITION
+              dstset.insert(grin_get_partition_id(g_, p));
+#else
+              // todo
+#endif
+            }
+            grin_destroy_partition(g_, p);
+            grin_destroy_vertex_ref(g_, v_ref);
+            grin_destroy_vertex(g_, neighbor);
+            grin_get_next_adjacent_list_iter(g_, e_iter);
+          }
+        }
+        id_num[internal_id] = dstset.size();
+        for (auto fid : dstset) {
+          fid_list.push_back(fid);
+        }
       }
-      fid_list_offset.resize(ivnum_ + 1, NULL);
-      std::vector<int> id_num(ivnum_, 0);
-      std::set<fid_t> dstset;
+
+      fid_list.shrink_to_fit();
+      fid_list_offset[0] = fid_list.data();
+      for (size_t i = 0; i < ivnum_; ++i) {
+        fid_list_offset[i + 1] = fid_list_offset[i] + id_num[i];
+      }
+#else  // GRIN_ENABLE_VERTEX_LIST_ARRAY
       size_t index = 0;
       auto iv_iter = grin_get_vertex_list_begin(g_, ivl_);
       while (!grin_is_vertex_list_end(g_, iv_iter)) {
