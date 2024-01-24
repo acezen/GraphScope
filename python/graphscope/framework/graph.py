@@ -1071,13 +1071,13 @@ class Graph(GraphInterface):
         )
 
     @staticmethod
-    def _load_from_graphar(path, sess, **kwargs):
+    def _load_from_graphar(path, sess, storage_options, **kwargs):
         # graphar now only support global vertex map.
         vertex_map = utils.vertex_map_type_to_enum("global")
-        oid_type = utils.get_oid_type_from_graph_info(path)
+        # oid_type = utils.get_oid_type_from_graph_info(path)
         config = {
             types_pb2.OID_TYPE: utils.s_to_attr(
-                oid_type
+               "int64_t"
             ),  # grahar use vertex index as oid, so it always be int64_t
             types_pb2.VID_TYPE: utils.s_to_attr("uint64_t"),
             types_pb2.IS_FROM_VINEYARD_ID: utils.b_to_attr(False),
@@ -1085,6 +1085,7 @@ class Graph(GraphInterface):
             types_pb2.VERTEX_MAP_TYPE: utils.i_to_attr(vertex_map),
             types_pb2.COMPACT_EDGES: utils.b_to_attr(False),
             types_pb2.GRAPH_INFO_PATH: utils.s_to_attr(path),
+            types_pb2.STORAGE_OPTIONS: utils.s_to_attr(json.dumps(storage_options)),
         }
         op = dag_utils.create_graph(
             sess.session_id, graph_def_pb2.ARROW_PROPERTY, inputs=[], attrs=config
@@ -1114,8 +1115,9 @@ class Graph(GraphInterface):
         if uri.scheme and "+" in uri.scheme:
             source = uri.scheme.split("+")[0]
             path = uri.scheme.split("+")[-1] + "://" + uri.netloc + uri.path
+            storage_options = kwargs.pop("storage_options", {})
             if source == "graphar":
-                return cls._load_from_graphar(path, sess)
+                return cls._load_from_graphar(uri.path, sess, storage_options)
             else:
                 raise ValueError("Unknown source: %s" % source)
         else:
@@ -1145,15 +1147,11 @@ class Graph(GraphInterface):
         """
         if format == "graphar":
             graphar_options = kwargs.pop("graphar_options", {})
-            graph_info_path = utils.generate_graphar_info_from_schema(
-                path,
-                self._schema,
-                graphar_options,
-            )
-            op = dag_utils.save_to_graphar(self, graph_info_path)
+            op = dag_utils.save_to_graphar(self, path, graphar_options)
+            graph_name = graphar_options.get("graph_name", "graph")
             self._session.dag.add_op(op)
             self._session._wrapper(op)
-            return {"type": format, "uri": "graphar+" + graph_info_path}
+            return {"type": format, "uri": "graphar+file://" + path + graph_name + ".graph.yml"}
         elif format == "serialization":
             # serialize graph
             storage_options = kwargs.pop("storage_options", {})

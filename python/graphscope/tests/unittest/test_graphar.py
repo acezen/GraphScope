@@ -42,3 +42,17 @@ def test_save_to_graphar(ldbc_graph):
         "edge_block_size": 1024,
     }
     ldbc_graph.save_to("/tmp/", format="graphar", graphar_options=graphar_options)
+
+def test_save_and_load_in_local_with_graphar(ldbc_graph, graphscope_session):
+    graphar_options = {
+        "graph_name": "ldbc_sample",
+        "file_type": "parquet",
+        "vertex_block_size": 256,
+        "edge_block_size": 1024,
+        "store_in_local": True,  # save to local file system
+    }
+    ldbc_graph.save_to("/tmp/", format="graphar", graphar_options=graphar_options)
+
+    # load from local file system
+    storage_options = {"store_in_local": True}
+    g = Graph.load_from("graphar+file:///tmp/ldbc_sample.graph.yaml", graphscope_session, storage_options=storage_options)
