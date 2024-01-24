@@ -1028,7 +1028,7 @@ def gremlin_to_subgraph(
     return op
 
 
-def save_to_graphar(graph, path):
+def save_to_graphar(graph, path, graphar_options=None):
     """Archive a graph to gar format with a path.
 
     Args:
@@ -1045,8 +1045,9 @@ def save_to_graphar(graph, path):
         types_pb2.VERTEX_MAP_TYPE: utils.i_to_attr(graph._vertex_map),
         types_pb2.COMPACT_EDGES: utils.b_to_attr(graph._compact_edges),
         types_pb2.USE_PERFECT_HASH: utils.b_to_attr(graph._use_perfect_hash),
+        types_pb2.WRITE_OPTIONS: utils.s_to_attr(json.dumps(graphar_options)),
+        types_pb2.GRAPH_INFO_PATH: utils.s_to_attr(path),
     }
-    config[types_pb2.GRAPH_INFO_PATH] = utils.s_to_attr(path)
     op = Operation(
         graph.session_id,
         types_pb2.ARCHIVE_GRAPH,

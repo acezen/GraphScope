@@ -15,6 +15,10 @@
 
 #include <memory>
 
+#include "boost/property_tree/exceptions.hpp"
+#include "boost/property_tree/json_parser.hpp"
+#include "boost/property_tree/ptree.hpp"
+
 #include "vineyard/client/client.h"
 #include "vineyard/common/util/macros.h"
 #include "vineyard/graph/fragment/arrow_fragment.h"
@@ -185,9 +189,22 @@ __attribute__((visibility("hidden"))) static bl::result<void> ArchiveGraph(
     vineyard::ObjectID frag_group_id, const grape::CommSpec& comm_spec,
     vineyard::Client& client, const gs::rpc::GSParams& params) {
 #ifdef ENABLE_GAR
-  BOOST_LEAF_AUTO(graph_info_path,
+  BOOST_LEAF_AUTO(output_path,
                   params.Get<std::string>(gs::rpc::GRAPH_INFO_PATH));
-
+  BOOST_LEAF_AUTO(write_option,
+                  params.Get<std::string>(gs::rpc::WRITE_OPTION));
+  boost::property_tree::ptree pt;
+  try {
+    boost::property_tree::read_json(write_option, pt);
+  } catch (boost::property_tree::json_parser_error& e) {
+    RETURN_GS_ERROR(vineyard::ErrorCode::kInvalidValueError,
+                    "Invalid write_option: " + std::string(e.what()));
+  }
+  std::string graph_name = pt.get<std::string>("graph_name", "");
+  std::string file_type = pt.get<std::string>("file_type", "parquet");
+  int64_t vertex_block_size = pt.get<int64_t>("vertex_block_size", 262144);  // default 2^18
+  int64_t edge_block_size = pt.get<int64_t>("edge_block_size", 4194304);  // default 2^22
+  bool store_in_local = pt.get<bool>("store_in_local", false);
   auto fg = std::dynamic_pointer_cast<vineyard::ArrowFragmentGroup>(
       client.GetObject(frag_group_id));
   auto fid = comm_spec.WorkerToFrag(comm_spec.worker_id());
@@ -195,7 +212,7 @@ __attribute__((visibility("hidden"))) static bl::result<void> ArchiveGraph(
   auto frag = std::static_pointer_cast<_GRAPH_TYPE>(client.GetObject(frag_id));
 
   using archive_t = vineyard::ArrowFragmentWriter<_GRAPH_TYPE>;
-  archive_t archive(frag, comm_spec, graph_info_path);
+  archive_t archive(frag, comm_spec, graph_name, out_path, vertex_block_size, edge_block_size, file_type, store_in_local);
   archive.WriteFragment();
 
   return {};

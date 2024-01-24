@@ -1145,12 +1145,7 @@ class Graph(GraphInterface):
         """
         if format == "graphar":
             graphar_options = kwargs.pop("graphar_options", {})
-            graph_info_path = utils.generate_graphar_info_from_schema(
-                path,
-                self._schema,
-                graphar_options,
-            )
-            op = dag_utils.save_to_graphar(self, graph_info_path)
+            op = dag_utils.save_to_graphar(self, path)
             self._session.dag.add_op(op)
             self._session._wrapper(op)
             return {"type": format, "uri": "graphar+" + graph_info_path}
