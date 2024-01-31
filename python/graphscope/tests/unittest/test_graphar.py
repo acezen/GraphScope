@@ -54,5 +54,9 @@ def test_save_and_load_in_local_with_graphar(ldbc_graph, graphscope_session):
     ldbc_graph.save_to("/tmp/", format="graphar", graphar_options=graphar_options)
 
     # load from local file system
-    storage_options = {"store_in_local": True}
+    storage_options = {
+        "store_in_local": True
+        "vertex_label": ["person"],
+        "edge_label": [("person", "knows", "person")],
+    }
     g = Graph.load_from("graphar+file:///tmp/ldbc_sample.graph.yaml", graphscope_session, storage_options=storage_options)

@@ -121,16 +121,34 @@ LoadGraph(const grape::CommSpec& comm_spec, vineyard::Client& client,
       boost::property_tree::ptree pt;
       bool store_in_local;
       std::stringstream ss(storage_option);
+      std::vector<std::string> vertex_labels;
+      std::vector<std::vector<std::string>> edge_labels;
       try {
         boost::property_tree::read_json(ss, pt);
         store_in_local = pt.get<bool>("store_in_local", false);
+        if (pt.count("vertex_label") != 0) {
+          for (auto& item : pt.get_child("vertex_label")) {
+            vertex_labels.push_back(item.second.get_value<std::string>());
+          }
+        }
+        if (pt.count("edge_label") != 0) {
+          for (auto& triple : pt.get_child("edge_label")) {
+            std::vector<std::string> edge_triple;
+            for (auto& item : triple.second) {
+              edge_triple.push_back(item.second.get_value<std::string>());
+            }
+            assert(edge_triple.size() == 3);
+            edge_labels.push_back(std::move(edge_triple));
+          }
+        }
       } catch (boost::property_tree::ptree_error const& e) {
         RETURN_GS_ERROR(vineyard::ErrorCode::kInvalidValueError,
                         "Invalid write_option: " + std::string(e.what()));
       }
       using loader_t =
           vineyard::gar_fragment_loader_t<oid_t, vid_t, vertex_map_t>;
-      loader_t loader(client, comm_spec, graph_info_path, true, false, store_in_local);
+      graph_info_path = graph_info_path + "_" + std::to_string(comm_spec.fid()) + "/p2p.graph.yaml";
+      loader_t loader(client, comm_spec, graph_info_path, vertex_labels, edge_labels, true, false, store_in_local);
       MPI_Barrier(comm_spec.comm());
       BOOST_LEAF_ASSIGN(frag_group_id, loader.LoadFragmentAsFragmentGroup());
 #else
@@ -228,6 +246,7 @@ __attribute__((visibility("hidden"))) static bl::result<void> ArchiveGraph(
   auto frag = std::static_pointer_cast<_GRAPH_TYPE>(client.GetObject(frag_id));
 
   using archive_t = vineyard::ArrowFragmentWriter<_GRAPH_TYPE>;
+  output_path = output_path + "_" + std::to_string(frag->fid()) + "/";
   archive_t archive(frag, comm_spec, graph_name, output_path, vertex_block_size, edge_block_size, file_type, store_in_local);
   BOOST_LEAF_CHECK(archive.WriteFragment());
 
