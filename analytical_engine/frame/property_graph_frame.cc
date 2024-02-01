@@ -147,7 +147,6 @@ LoadGraph(const grape::CommSpec& comm_spec, vineyard::Client& client,
       }
       using loader_t =
           vineyard::gar_fragment_loader_t<oid_t, vid_t, vertex_map_t>;
-      graph_info_path = graph_info_path + "_" + std::to_string(comm_spec.fid()) + "/p2p.graph.yaml";
       loader_t loader(client, comm_spec, graph_info_path, vertex_labels, edge_labels, true, false, store_in_local);
       MPI_Barrier(comm_spec.comm());
       BOOST_LEAF_ASSIGN(frag_group_id, loader.LoadFragmentAsFragmentGroup());
@@ -246,7 +245,6 @@ __attribute__((visibility("hidden"))) static bl::result<void> ArchiveGraph(
   auto frag = std::static_pointer_cast<_GRAPH_TYPE>(client.GetObject(frag_id));
 
   using archive_t = vineyard::ArrowFragmentWriter<_GRAPH_TYPE>;
-  output_path = output_path + "_" + std::to_string(frag->fid()) + "/";
   archive_t archive(frag, comm_spec, graph_name, output_path, vertex_block_size, edge_block_size, file_type, store_in_local);
   BOOST_LEAF_CHECK(archive.WriteFragment());
 
