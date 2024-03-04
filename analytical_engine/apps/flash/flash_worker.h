@@ -22,6 +22,7 @@ limitations under the License.
 #include <ostream>
 #include <type_traits>
 #include <utility>
+#include <fstream>
 
 #include "flash/flash_app_base.h"
 #include "flash/flash_ware.h"
@@ -78,6 +79,12 @@ class FlashWorker {
     fw_->Start();
     app_->Run(*graph_, fw_, std::forward<Args>(args)...);
     context_->template SetResult<APP_T>(fw_, app_);
+    std::ofstream ostream;
+    std::string output_path = "/home/xianzhong.sxz/data/harmonic_result.txt";
+                                                       
+    ostream.open(output_path);
+    context_->Output(ostream);
+    ostream.close();
     fw_->Terminate();
   }
 
