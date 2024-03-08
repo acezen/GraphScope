@@ -246,6 +246,7 @@ __attribute__((visibility("hidden"))) static bl::result<void> ArchiveGraph(
 
   using archive_t = vineyard::ArrowFragmentWriter<_GRAPH_TYPE>;
   archive_t archive(frag, comm_spec, graph_name, output_path, vertex_block_size, edge_block_size, file_type, store_in_local);
+  BOOST_LEAF_CHECK(archive.WriteGraphInfo(output_path));
   BOOST_LEAF_CHECK(archive.WriteFragment());
 
   return {};
