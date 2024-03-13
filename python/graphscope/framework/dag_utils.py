@@ -1071,7 +1071,7 @@ def fetch_gremlin_result(result_set, fetch_type="one"):
     return op
 
 
-def archive_graph(graph, path: str, **kwargs):
+def save_to_graphar(graph, path: str, **kwargs):
     """Archive a graph to gar format with a path.
 
     Args:
