@@ -34,6 +34,10 @@ jobs:
         # also make coordinator and client for python test
         make coordinator && make client
         popd
+    
+    - name: Install dependencies
+      run: |
+        python3 -m pip install -r coordinator/requirements.txt -r python/requirements.txt
 
     - name: Run Forward algorithms test
       env:
