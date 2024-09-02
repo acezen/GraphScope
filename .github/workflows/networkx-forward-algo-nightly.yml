@@ -37,6 +37,7 @@ jobs:
     
     - name: Install dependencies
       run: |
+        python3 -m pip install pip==20.3.4
         python3 -m pip install -r coordinator/requirements.txt -r python/requirements.txt
 
     - name: Run Forward algorithms test
