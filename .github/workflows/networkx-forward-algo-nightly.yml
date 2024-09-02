@@ -32,7 +32,7 @@ jobs:
         sudo mkdir -p ${install_prefix}
         sudo make analytical-install BUILD_TEST=OFF NUMPROC=1 INSTALL_PREFIX=${install_prefix}
         # also make coordinator and client for python test
-        make coordinator && make client
+        sudo make coordinator && sudo make client
         popd
     
     - name: Run Forward algorithms test
