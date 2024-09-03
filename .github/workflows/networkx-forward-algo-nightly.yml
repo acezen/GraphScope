@@ -27,12 +27,12 @@ jobs:
     - name: Build GAE and coordinator
       run: |
         pushd ${GITHUB_WORKSPACE}
-        sudo . /home/graphscope/.graphscope_env
+        . /home/graphscope/.graphscope_env
         install_prefix=/opt/graphscope
-        sudo mkdir -p ${install_prefix}
-        sudo make analytical-install BUILD_TEST=OFF NUMPROC=1 INSTALL_PREFIX=${install_prefix}
+        sudo -E mkdir -p ${install_prefix}
+        sudo -E make analytical-install BUILD_TEST=OFF NUMPROC=1 INSTALL_PREFIX=${install_prefix}
         # also make coordinator and client for python test
-        sudo make coordinator && sudo make client
+        sudo -E make coordinator && sudo make client
         popd
     
     - name: Run Forward algorithms test
