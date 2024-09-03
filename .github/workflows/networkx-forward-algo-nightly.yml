@@ -42,7 +42,7 @@ jobs:
         cd ${GITHUB_WORKSPACE}/python
         . /home/graphscope/.graphscope_env
         export GRAPHSCOPE_HOME=/opt/graphscope
-        python3 -m pytest --cov=graphscope --cov-config=.coveragerc --cov-report=xml \
+        python3 -m pytest --timeout=36000 --cov=graphscope --cov-config=.coveragerc --cov-report=xml \
           --cov-report=term -s -v -m "not slow" graphscope/nx/algorithms/tests/forward
 
     - name: Upload Coverage
